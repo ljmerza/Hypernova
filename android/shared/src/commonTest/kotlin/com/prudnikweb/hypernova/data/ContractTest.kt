@@ -1124,6 +1124,53 @@ class ContractTest {
             assertTrue(e.serverMessage!!.contains("still off"))
         },
         "rest-mcp-no-server" to { o -> assertEquals("no_server", Api.errorOf(404, o.toString()).code) },
+        "rest-settings-form" to { o ->
+            val r = SettingsFormReply.wire(o)
+            assertEquals("claude", r.agent)
+            assertEquals("file-hash", r.hash)
+            assertTrue(r.canChange)
+            val rows = r.rows.associateBy { it.key }
+            fun row(key: String) = rows[key] ?: error("no row for $key")
+            assertEquals(FormRow.SWITCH, row("verbose").control)
+            assertEquals(true, row("verbose").on)
+            assertEquals(FormRow.NUMBER, row("cleanupPeriodDays").control)
+            assertEquals("30", row("cleanupPeriodDays").number)
+            assertEquals(1.0, row("cleanupPeriodDays").rules.min)
+            assertEquals(FormRow.LIST, row("availableModels").control)
+            assertEquals(listOf("opus"), row("availableModels").items)
+            assertEquals(FormRow.JSON, row("attribution").control)
+            assertTrue(row("attribution").json!!.contains("\"commit\""))
+            assertEquals(FormRow.PICK, row("theme").control)
+            assertEquals("dark", row("theme").string)
+            assertEquals(r.placeholder, row("apiKeyHelper").string)
+            assertEquals("runs", row("apiKeyHelper").asks)
+            assertEquals(1, row("apiKeyHelper").hidden)
+            assertEquals("env", row("env").screen)
+            assertEquals(FormRow.LINK, row("env").control)
+            assertEquals("rules", row("permissions.allow").screen)
+            assertEquals("managed", row("allowManagedHooksOnly").readOnly)
+            assertTrue(row("laterKey").notInSchema)
+            assertEquals("unknown", row("laterKey").asks)
+            assertEquals("bypassPermissions", row("permissions.defaultMode").string)
+            assertFalse(row("permissions.defaultMode").choices.any { it.text == "bypassPermissions" })
+            assertEquals("new_sessions", row("permissions.defaultMode").applies)
+            assertFalse(row("editorMode").isSet)
+            assertEquals("normal", row("editorMode").defaultWords)
+        },
+        "rest-settings-form-saved" to { o ->
+            val s = FormSaved.wire(o)
+            assertTrue(s.changed)
+            assertEquals("file-hash", s.hash)
+        },
+        "rest-settings-form-undone" to { o -> assertTrue(o.bool("ok")) },
+        "rest-settings-form-confirm" to { o ->
+            val e = Api.errorOf(403, o.toString())
+            assertEquals(SettingsFormLogic.CONFIRM_NEEDED, e.code)
+            assertTrue(e.serverMessage!!.startsWith("hooks"))
+        },
+        "rest-settings-form-refused" to { o -> assertEquals("value_not_allowed", Api.errorOf(403, o.toString()).code) },
+        "rest-settings-form-managed" to { o -> assertEquals("managed_only", Api.errorOf(403, o.toString()).code) },
+        "rest-settings-form-bad-value" to { o -> assertEquals("bad_value", Api.errorOf(400, o.toString()).code) },
         "rest-agent-settings-put" to { o ->
             val c = SettingChange.wire(o)
             assertTrue(c.changed)

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Every one of an agent's settings as a form: docs/DECISIONS.md, "Every setting, from the agents' own schemas" -->
+    <string name="sf_title_claude">All of Claude Code\'s settings</string>
+    <string name="sf_title_codex">All of Codex\'s settings</string>
+    <string name="sf_row">All settings</string>
+    <string name="sf_row_body">Every setting the agent lists, with search</string>
+    <string name="sf_search">Search names and descriptions</string>
+    <string name="sf_source">The list is from %1$s, checked against %2$s.</string>
+    <string name="sf_scope_claude">These are ~/.claude/settings.json. A project\'s own settings can override them.</string>
+    <string name="sf_scope_codex">These are ~/.codex/config.toml. Only plain values at its top level change here: tables and lists are changed on the server.</string>
+    <string name="sf_when_unknown">When this applies isn\'t known here.</string>
+    <string name="sf_not_set">Not set</string>
+    <string name="sf_not_set_default">Not set. Default: %1$s</string>
+    <string name="sf_on">On</string>
+    <string name="sf_off">Off</string>
+    <string name="sf_set_mark">Set</string>
+    <string name="sf_set_hidden">Set, and hidden</string>
+    <string name="sf_in_file">In the file</string>
+    <string name="sf_hidden">Hidden on the server. Type a new value to replace it.</string>
+    <string name="sf_hidden_json">%1$s stands for what stays on the server. Leave it where it is to keep that value.</string>
+    <string name="sf_hidden_keys">%1$d more in the file, with names that aren\'t shown here. The JSON tab has them.</string>
+    <string name="sf_remove">Remove from the file</string>
+    <string name="sf_add">Add</string>
+    <string name="sf_item_hint">Add one</string>
+    <string name="sf_item_remove">Remove %1$s</string>
+    <string name="sf_change_action">Change it</string>
+    <string name="sf_open">Open</string>
+    <string name="sf_own_screen_rules">Permission rules</string>
+    <string name="sf_ro_managed">This only does something in a managed install, so it isn\'t changed from here.</string>
+    <string name="sf_ro_not_offered">This turns a permission check off for good, so it isn\'t offered. If it\'s in the file it can be removed.</string>
+    <string name="sf_ro_shape">This is a table or a list in the file, so it\'s changed on the server.</string>
+    <string name="sf_ro_too_big">This is too long for here. The JSON tab has it.</string>
+    <string name="sf_not_read">%1$s doesn\'t check this key in this file, so it may do nothing.</string>
+    <string name="sf_not_in_schema">In the file, and not on the agent\'s published list. It asks first, because what it does isn\'t known here.</string>
+    <string name="sf_asks_runs">Asks first: can run a command</string>
+    <string name="sf_asks_loosens">Asks first: can allow more</string>
+    <string name="sf_asks_reach">Asks first: changes what\'s reached</string>
+    <string name="sf_asks_unknown">Asks first: what it does isn\'t known</string>
+    <string name="sf_p_needed">This needs a value.</string>
+    <string name="sf_p_short">At least %1$d characters.</string>
+    <string name="sf_p_long">At most %1$d characters.</string>
+    <string name="sf_p_form">That isn\'t in the form this takes.</string>
+    <string name="sf_p_nan">That isn\'t a number.</string>
+    <string name="sf_p_whole">This takes a whole number.</string>
+    <string name="sf_p_below">The least this takes is %1$s.</string>
+    <string name="sf_p_above">The most this takes is %1$s.</string>
+    <string name="sf_p_not_over">This has to be more than %1$s.</string>
+    <string name="sf_p_many">This takes at most %1$d.</string>
+    <string name="sf_p_few">This needs at least %1$d.</string>
+    <string name="sf_p_twice">That\'s the same one twice.</string>
+    <string name="sf_none">No setting matches that.</string>
+    <string name="sf_err">Couldn\'t read these settings.</string>
+    <string name="sf_state_malformed">This file isn\'t valid, so nothing here can be shown or changed. Fix it on the server.</string>
+    <string name="sf_state_unreadable">This file can\'t be read on the server.</string>
+</resources>

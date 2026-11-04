@@ -3244,7 +3244,7 @@ Step two of "The agents' settings, viewed" (`docs/LATER.md`, L102). **The owner 
 edits a settings file"**, with these limits. `daemon/src/agent-settings-edit.ts` is the one place it does;
 `daemon/src/always.ts` says so, and the rules still go through Claude Code.
 
-1. **A fixed list, on the server.** Anything else is refused before a file is opened.
+1. **A fixed list, on the server.** Anything else is refused before a file is opened. (Reversed for the form of every setting, 2026-11-04: "Every setting, from the agents' own schemas". This route keeps its list.)
 
    | | Editable, with these values | View only |
    |---|---|---|
@@ -4703,3 +4703,36 @@ The owner: "is there a way to make to see how fast her for the Gradle takes almo
 ### Not proven
 
 These times are from a machine shared with other work, at load averages from about 13 to 49 on 12 threads. Nothing here has run on GitHub, so whether it reaches half is only known after the first push. `verifyRoborazziDebug` isn't in this workflow, and wasn't before.
+## Every setting, from the agents' own schemas (2026-11-04)
+
+The owner: "I want to be able to fully edit the settings from the ui". Offered three ways, he chose: every key gets a control, generated from Claude Code's schema, grouped, with search; the current rows keep their plain wording; complex settings open a small JSON editor for just that key. And, once it was under way: "but don't add fingerprinting needed".
+
+**This reverses "a fixed list, on the server"** in "The agents' settings, edited", and it adds an exception to "Running new code needs the fingerprint" for this form alone. The fingerprints elsewhere stay as they are: Bypass on the sheet, plugin installs, agent updates, the JSON tab.
+
+**What still protects things, all on the server:**
+
+1. **One reviewed table** (`daemon/src/agent-settings-classes.ts`) says what each key takes. `test/agent-settings-form.test.ts` fails on a key of the shipped schema that isn't in it, so a refresh brings nothing in unread. A key the table has never heard of, in a file from a later agent, asks.
+2. **Whatever loosens a permission, runs code or changes what's reached wants a plain one-tap confirm saying what it does,** and the server refuses without the flag that says it was given (`confirm_needed`). No `OwnerCheck`, so the desktop can do these too. That's a promise about the client's honesty, not a check on a person: `docs/SECURITY-MODEL.md`, 25.
+3. **`loosens()` still decides the permission keys,** each way: tightening asks nothing.
+4. **Permissive values aren't offered and are refused, confirm or not.** `bypassPermissions`, `delegate`, `rc`, `never`, `danger-full-access`: the form offers what the list offers, and `classify()`, the JSON tab's, catches a dangerous key nested in what an editor sends. A file holding one shows it, can move off it, and Undo won't put it back.
+5. **Secrets stay masked,** by the JSON tab's classes and placeholder. Helper commands (`apiKeyHelper`, `awsAuthRefresh`, `awsCredentialExport`, `gcpAuthRefresh`, `otelHeadersHelper`, `processWrapper`) go further than the JSON tab: their whole text stays on the server, whatever it looks like. A mask sent back changes nothing, and one anywhere else is refused. Logs name the key and never its value. `hooks` and `statusLine` commands are shown as the JSON tab shows them, with what looks secret kept back, since editing them is the point.
+6. **The same writer.** `commitEdit` in `agent-settings-edit.ts` is the list's own: those bytes and nothing else, the hash looked at again last thing, the backup, one step of Undo, a link refused. The form has no file code of its own.
+
+**Which schema, and how it matched the real program.** Claude Code's is SchemaStore's `claude-code-settings.json` (142 top-level keys), Apache-2.0 as that repository is, with no licence of its own in the file. It's a copy in `daemon/src/schemas/`, refreshed by hand with `scripts/refresh-agent-schemas.sh`; nothing fetches it at run time. Measured against Claude Code 2.1.318 with `claude doctor` in a throwaway home, which names each invalid value, and against the binary's own settings object by name:
+
+- 18 keys of the schema aren't in that object. Of those, 4 appear nowhere in the binary: `permissionExplainerEnabled`, `skippedMarketplaces`, `skippedPlugins`, `teammateDefaultModel`. 4 are in its global config instead: `autoConnectIde`, `autoInstallIdeExtension`, `diffTool`, `externalEditorContext`. These 8 are marked `notRead`, and the row says it may do nothing. The other 10 are checked through its feature tables or mentioned elsewhere.
+- 64 keys are in the binary's object and not in the schema (`autoDreamEnabled`, `modelSettings`, `timeFormat`, `quietHours` and more). They aren't offered: its own descriptions aren't ours to ship, and several look experimental. One already in a file shows as a JSON row that asks. `docs/LATER.md`, L131.
+- `permissions.defaultMode`: the schema lists `delegate` and `manual`; the binary's own error lists neither. The list's values are what's offered.
+- Every value the form offers, `doctor` accepts (`test/settings-form-e2e.test.ts`). That proves it reads as valid, not that each does what its description says.
+
+**Who holds the catalog: the daemon.** It's beside the installed agent and it decides, so an older server has no form and today's list goes on. **Not in `GET /v1/agents/settings`, as first expected:** that's read again after each change and by several screens, and the rows' words came to about 50 KB. It's `GET /v1/agents/settings/form`, and an older server's 404 says so on the screen.
+
+**Codex: a real schema, so the same form, as far as is honest.** `codex-rs/core/config.schema.json` at tag `rust-v0.164.0`, Apache-2.0, 103 keys, the same version as the installed 0.164.0. Plain values at its top level get controls. Tables and lists show only that they're there, with no value and no editing, because the TOML reader can't see inside to mask ("JSON mode", 10).
+
+**Enterprise-only keys are hidden, and read-only if the file has them,** with the server refusing a change (`managed_only`). A person can't get anything from them outside a managed install; `doctor` itself says so of `managedMcpServers`. The JSON tab can still take one out. Where the schema says "(Managed settings)" without "only" (`enforceAvailableModels`, `sshConfigs`, `strictPluginOnlyCustomization`), they're treated the same, though that isn't measured.
+
+**What has its own screen stays there:** `permissions.allow`, `ask` and `deny`, MCP's approvals, Plugins, Environment variables, Effort by model. The row points there, sends nothing of the value, and the server refuses it here. `enableAllProjectMcpServers` has no screen and asks as running code. Permission rules' row opens the JSON tab until that screen lands.
+
+**When it applies:** the rows the app has checked keep their words ("The agents' settings, edited", 7). Every other row says it isn't known. Nothing else was measured.
+
+**User scope only.** A project's and a local file are the JSON tab's. `docs/LATER.md`, L132.

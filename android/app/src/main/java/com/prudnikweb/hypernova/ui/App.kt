@@ -580,9 +580,19 @@ private fun Screens(
                 is Route.Terminal -> com.prudnikweb.hypernova.ui.term.TerminalScreen(shown, r.sessionId, onBack = { nav.pop() })
                 is Route.Agent -> com.prudnikweb.hypernova.ui.session.AgentScreen(shown, r.sessionId, r.agentId, onBack = { nav.pop() })
                 Route.Providers -> ProvidersScreen(shown, onBack = { nav.pop() }, onEdit = { id, kind -> nav.push(Route.ProviderEdit(id, kind)) }, onAgentSettings = { nav.push(Route.AgentSettings(it)) })
-                is Route.AgentSettings -> com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen(shown, r.agent, onBack = { nav.pop() }, onMcp = { nav.push(Route.McpServers(r.agent)) }, onPlugins = { nav.push(Route.Plugins(r.agent)) }, onSkills = { nav.push(Route.Skills(r.agent)) }, onEnv = { nav.push(Route.AgentEnv(r.agent)) }, onJson = { nav.push(Route.AgentRaw(r.agent)) }, onRules = { nav.push(Route.AgentRules(r.agent)) })
+                is Route.AgentSettings -> com.prudnikweb.hypernova.ui.settings.AgentSettingsScreen(shown, r.agent, onBack = { nav.pop() }, onMcp = { nav.push(Route.McpServers(r.agent)) }, onPlugins = { nav.push(Route.Plugins(r.agent)) }, onSkills = { nav.push(Route.Skills(r.agent)) }, onEnv = { nav.push(Route.AgentEnv(r.agent)) }, onJson = { nav.push(Route.AgentRaw(r.agent)) }, onRules = { nav.push(Route.AgentRules(r.agent)) }, onAll = { nav.push(Route.AgentForm(r.agent)) })
                 is Route.AgentRaw -> com.prudnikweb.hypernova.ui.settings.AgentRawScreen(shown, r.agent, onBack = { nav.pop() })
                 is Route.AgentRules -> com.prudnikweb.hypernova.ui.settings.AgentRulesScreen(shown, r.agent, onBack = { nav.pop() })
+                is Route.AgentForm -> com.prudnikweb.hypernova.ui.settings.AgentFormScreen(shown, r.agent, onBack = { nav.pop() }, onScreen = { screen ->
+                    when (screen) {
+                        "mcp" -> nav.push(Route.McpServers(r.agent))
+                        "plugins" -> nav.push(Route.Plugins(r.agent))
+                        "env" -> nav.push(Route.AgentEnv(r.agent))
+                        "rules" -> nav.push(Route.AgentRules(r.agent))
+                        // Effort by model is on the list screen.
+                        else -> nav.pop()
+                    }
+                })
                 is Route.AgentEnv -> com.prudnikweb.hypernova.ui.settings.AgentEnvScreen(shown, r.agent, onBack = { nav.pop() })
                 is Route.Skills -> com.prudnikweb.hypernova.ui.settings.SkillsScreen(shown, r.agent, onBack = { nav.pop() })
                 is Route.Plugins -> com.prudnikweb.hypernova.ui.settings.PluginsScreen(shown, r.agent, onBack = { nav.pop() }, onOpen = { id, scope, folder, on -> nav.push(Route.PluginPage(r.agent, id, scope, folder, on)) }, onBrowse = { folder -> nav.push(Route.PluginBrowse(r.agent, folder)) })

@@ -32,6 +32,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -80,6 +82,12 @@ private val COLUMN = 640.dp
  */
 @Composable
 fun SettingsScreen(shell: Shell) {
+    var agentForm by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    val hub = Core.live
+    if (agentForm != null && hub != null) {
+        AgentFormPane(hub, agentForm!!, onBack = { agentForm = null })
+        return
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.widthIn(max = COLUMN).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -100,9 +108,11 @@ fun SettingsScreen(shell: Shell) {
             Seam(Ui.st_top_bar.text())
             Spacer(Modifier.height(8.dp))
             TopBarSection()
-            Core.live?.let { hub ->
+            if (hub != null) {
                 Spacer(Modifier.height(16.dp))
                 RulesRow(shell, hub.mac.name)
+                Spacer(Modifier.height(16.dp))
+                AgentFormLinks { agentForm = it }
             }
         }
     }

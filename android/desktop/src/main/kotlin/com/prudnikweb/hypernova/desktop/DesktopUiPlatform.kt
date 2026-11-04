@@ -361,7 +361,7 @@ private object DeskImages : UiImages {
     }
 }
 
-/** A computer's Read aloud isn't built: it needs a player, and the seam says none (`SpeechOutput`). LATER L131. */
+/** A computer's Read aloud isn't built: it needs a player, and the seam says none (`SpeechOutput`). LATER L135. */
 private object NoReading : UiReading {
     override val canRead: Boolean = false
     override val now: String? = null

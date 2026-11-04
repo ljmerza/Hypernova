@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}, onRules: () -> Unit = {}) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}, onRules: () -> Unit = {}, onAll: () -> Unit = {}) {
     val bottom = screenBottom()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -250,6 +250,7 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                     }
                 }
             }
+            item(key = "all-settings") { AllSettingsRow(onAll) }
         }
     }
     val key = picking

@@ -231,9 +231,9 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
 | Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No quick prompts: "The shared drawing" lists what isn't |
 | A message's menu: Copy, Quote, Rewind, its exact time, a waiting prompt's Edit and Remove | There | The phone's own (`MessageMenu.kt`, `WaitingMenu.kt`), on the other mouse button. No Select page: a mouse selects the words where they are |
-| Read aloud from a message | Not yet | LATER L131: it needs a player and a voice |
+| Read aloud from a message | Not yet | LATER L135: it needs a player and a voice |
 | The "/" list in the box, its hint | There | The phone's own (`Commands.kt`), and Tab puts the best match in |
-| Attaching files to a prompt: uploaded at once, shown, retried, waited for; a picture from the clipboard | There | `AttachState` is shared, with the phone's rules (`DeskAttach.kt` scales a photo as `Picked.kt` does). The system's file dialog for the paperclip, Ctrl+V for a picture. No camera. Whether Skia keeps a photo's location and turns it upright isn't checked: LATER L133 |
+| Attaching files to a prompt: uploaded at once, shown, retried, waited for; a picture from the clipboard | There | `AttachState` is shared, with the phone's rules (`DeskAttach.kt` scales a photo as `Picked.kt` does). The system's file dialog for the paperclip, Ctrl+V for a picture. No camera. Whether Skia keeps a photo's location and turns it upright isn't checked: LATER L136 |
 | A prompt's sent pictures and files | There | Their pictures come from the server (`SentFiles`). Opening a file says it's on the phone |
 | The top bar (usage strip): the context ring, mode, effort, the plan's windows and any of the items Settings chooses, Compact past 85%, the blocked mark | There | The phone's own (`ui.session.UsageStrip.kt`, `TopBar.kt`), between the card and the chat. Settings has the phone's row for what it shows (`ui.settings.TopBarSection.kt`), kept on this computer |
 | The status bar and its details: what it's doing, to-dos, the agents, the whole command, the turn's time and tokens, Stop | There | The phone's own (`ui.session.StatusBar.kt`), over the box. An agent's row says its screen is on the phone. Opened, it keeps to 45% of the pane |
@@ -275,6 +275,8 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Settings: where the key and tokens are, alerts | Desktop only | |
 | Settings: an agent's permission rules | Partly | The phone's own parts (`sharedui`'s `ui/settings/AgentRulesParts.kt`), from Settings on the server on screen, and written to do all the phone does (docs/DECISIONS.md, "Permission rules, edited"). Not settled: `RulesScreenTest` sometimes stays on Loading after the server has been asked, not yet explained, and it hasn't run against a real server |
 | Settings: providers, account and sign-in, agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
+| Settings: every one of an agent's settings, the form (`ui.settings` in `sharedui`, `AgentFormPane.kt`) | There | Same rows and same one-tap confirm as the phone, what runs code included: there's no fingerprint to wait for (DECISIONS, "Every setting, from the agents' own schemas"). A row with a screen of its own only says which, until those screens come |
+| Settings: providers, account and sign-in, the short list of agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
 | Settings: notifications per group, Read aloud, top bar, typing, display, the server's switches (auto-update, debug, Browse outside projects, Stay awake), checklist, connection log | Not yet | |
 
 **What only a phone is for**

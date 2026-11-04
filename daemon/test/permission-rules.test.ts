@@ -125,6 +125,18 @@ test('highest precedence first: managed (its file, then drop-ins A to Z), local,
   }
 })
 
+test('a secret in a rule stays on the server: the phone gets a placeholder, and plain rules as they are', async () => {
+  const cwd = project('secret', 'perm-secret')
+  const secret = 'abcdef0123456789abcdef0123456789abcdef01'
+  put(join(cwd, '.claude', 'settings.json'), { permissions: { allow: [`Bash(curl -H "Authorization: Bearer ${secret}" https://x.test/*)`, 'Bash(npm test:*)'] } })
+  const r = await call('GET', '/v1/sessions/perm-secret/permissions')
+  assert.equal(r.status, 200)
+  assert.ok(!JSON.stringify(r.json).includes(secret), 'the secret left the server')
+  const allow = r.json.permissions.sources.find((x: any) => x.source === 'project').allow
+  assert.equal(allow[0], 'Bash(curl -H "Authorization: Bearer <hidden on the server 1>" https://x.test/*)')
+  assert.equal(allow[1], 'Bash(npm test:*)')
+})
+
 test('missing and broken files are said by name; no managed policy, no managed source', async () => {
   const cwd = project('broken', 'perm-broken')
   put(join(cwd, '.claude', 'settings.local.json'), '{"permissions": {"allow": [')

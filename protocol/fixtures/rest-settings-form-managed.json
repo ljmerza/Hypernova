@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "managed_only",
+    "message": "That setting does nothing outside a managed install, so it isn’t changed from here."
+  }
+}

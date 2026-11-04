@@ -89,7 +89,7 @@ class MessageMenuTest {
         menuOn("The first answer")
         onNodeWithText(word(Str.chat_copy)).assertIsDisplayed()
         onNodeWithText(word(Str.chat_quote)).assertIsDisplayed()
-        // Not here: a voice (LATER L131), and a page to select in, as a mouse selects the words where they are.
+        // Not here: a voice (LATER L135), and a page to select in, as a mouse selects the words where they are.
         onNodeWithText(word(Str.chat_read)).assertDoesNotExist()
         onNodeWithText(word(Str.chat_select)).assertDoesNotExist()
         // A reply has no rewind of its own.

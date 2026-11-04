@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "confirm_needed",
+    "message": "hooks\n\nThis can run a command on the server, as you, with nothing more to confirm."
+  }
+}

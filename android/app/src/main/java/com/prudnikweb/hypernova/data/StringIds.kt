@@ -147,7 +147,6 @@ val Str.id: Int
         Str.stats_tokens -> R.string.stats_tokens
         Str.stats_tool_calls -> R.string.stats_tool_calls
         Str.stats_work -> R.string.stats_work
-        Str.try_again -> R.string.try_again
         Str.about_github_no_browser -> R.string.about_github_no_browser
         Str.activity_ended -> R.string.activity_ended
         Str.activity_error -> R.string.activity_error
@@ -360,7 +359,6 @@ val Str.id: Int
         Str.busy_title -> R.string.busy_title
         Str.by_mac -> R.string.by_mac
         Str.by_terminal -> R.string.by_terminal
-        Str.cancel -> R.string.cancel
         Str.changes_entry -> R.string.changes_entry
         Str.changes_err -> R.string.changes_err
         Str.chat_close -> R.string.chat_close
@@ -584,7 +582,6 @@ val Str.id: Int
         Str.link_said_sleep_soon -> R.string.link_said_sleep_soon
         Str.link_said_via -> R.string.link_said_via
         Str.link_unpaired -> R.string.link_unpaired
-        Str.loading -> R.string.loading
         Str.loading_conversation -> R.string.loading_conversation
         Str.mcp_a_destructive -> R.string.mcp_a_destructive
         Str.mcp_a_read_only -> R.string.mcp_a_read_only
@@ -993,11 +990,7 @@ val Str.id: Int
         Str.state_starting -> R.string.state_starting
         Str.state_unavailable -> R.string.state_unavailable
         Str.state_working -> R.string.state_working
-        Str.stats_bn -> R.string.stats_bn
         Str.stats_day_tokens -> R.string.stats_day_tokens
-        Str.stats_k -> R.string.stats_k
-        Str.stats_mn -> R.string.stats_mn
-        Str.stats_said_hm -> R.string.stats_said_hm
         Str.status_agent_done -> R.string.status_agent_done
         Str.status_agent_running -> R.string.status_agent_running
         Str.status_agent_said -> R.string.status_agent_said
@@ -1078,7 +1071,6 @@ val Str.id: Int
         Str.top_bar_turn_said -> R.string.top_bar_turn_said
         Str.top_bar_week_pace -> R.string.top_bar_week_pace
         Str.top_bar_week_pace_even_said -> R.string.top_bar_week_pace_even_said
-        Str.try_again -> R.string.try_again
         Str.unpaired_body -> R.string.unpaired_body
         Str.unpaired_body_linux -> R.string.unpaired_body_linux
         Str.untitled_session -> R.string.untitled_session
@@ -1143,6 +1135,136 @@ val Str.id: Int
         Str.why_seam -> R.string.why_seam
         Str.workflow_label -> R.string.workflow_label
         Str.workflow_running_of -> R.string.workflow_running_of
+        Str.as_k_effort -> R.string.as_k_effort
+        Str.as_k_effort_body -> R.string.as_k_effort_body
+        Str.as_k_mode -> R.string.as_k_mode
+        Str.as_k_mode_body -> R.string.as_k_mode_body
+        Str.as_k_thinking -> R.string.as_k_thinking
+        Str.as_k_thinking_body -> R.string.as_k_thinking_body
+        Str.as_k_dream -> R.string.as_k_dream
+        Str.as_k_dream_body -> R.string.as_k_dream_body
+        Str.as_k_coauthor -> R.string.as_k_coauthor
+        Str.as_k_coauthor_body -> R.string.as_k_coauthor_body
+        Str.as_k_channel -> R.string.as_k_channel
+        Str.as_k_channel_body -> R.string.as_k_channel_body
+        Str.as_k_input -> R.string.as_k_input
+        Str.as_k_input_body -> R.string.as_k_input_body
+        Str.as_k_agent_push -> R.string.as_k_agent_push
+        Str.as_k_agent_push_body -> R.string.as_k_agent_push_body
+        Str.as_k_model -> R.string.as_k_model
+        Str.as_k_model_body -> R.string.as_k_model_body
+        Str.as_k_reasoning -> R.string.as_k_reasoning
+        Str.as_k_reasoning_body -> R.string.as_k_reasoning_body
+        Str.as_k_approval -> R.string.as_k_approval
+        Str.as_k_approval_body -> R.string.as_k_approval_body
+        Str.as_k_sandbox -> R.string.as_k_sandbox
+        Str.as_k_sandbox_body -> R.string.as_k_sandbox_body
+        Str.as_k_web -> R.string.as_k_web
+        Str.as_k_web_body -> R.string.as_k_web_body
+        Str.as_k_personality -> R.string.as_k_personality
+        Str.as_k_personality_body -> R.string.as_k_personality_body
+        Str.as_v_none -> R.string.as_v_none
+        Str.as_v_minimal -> R.string.as_v_minimal
+        Str.as_v_low -> R.string.as_v_low
+        Str.as_v_medium -> R.string.as_v_medium
+        Str.as_v_high -> R.string.as_v_high
+        Str.as_v_xhigh -> R.string.as_v_xhigh
+        Str.as_v_max -> R.string.as_v_max
+        Str.as_v_ultra -> R.string.as_v_ultra
+        Str.as_v_dont_ask -> R.string.as_v_dont_ask
+        Str.as_v_latest -> R.string.as_v_latest
+        Str.as_v_stable -> R.string.as_v_stable
+        Str.as_v_rc -> R.string.as_v_rc
+        Str.as_v_untrusted -> R.string.as_v_untrusted
+        Str.as_v_on_failure -> R.string.as_v_on_failure
+        Str.as_v_on_request -> R.string.as_v_on_request
+        Str.as_v_never -> R.string.as_v_never
+        Str.as_v_read_only -> R.string.as_v_read_only
+        Str.as_v_workspace_write -> R.string.as_v_workspace_write
+        Str.as_v_full_access -> R.string.as_v_full_access
+        Str.as_v_disabled -> R.string.as_v_disabled
+        Str.as_v_cached -> R.string.as_v_cached
+        Str.as_v_indexed -> R.string.as_v_indexed
+        Str.as_v_live -> R.string.as_v_live
+        Str.as_v_friendly -> R.string.as_v_friendly
+        Str.as_v_pragmatic -> R.string.as_v_pragmatic
+        Str.as_when_new_sessions -> R.string.as_when_new_sessions
+        Str.as_when_maybe_new_session -> R.string.as_when_maybe_new_session
+        Str.as_when_next_update -> R.string.as_when_next_update
+        Str.as_when_new_threads -> R.string.as_when_new_threads
+        Str.as_when_new_threads_unchosen -> R.string.as_when_new_threads_unchosen
+        Str.as_l_plan -> R.string.as_l_plan
+        Str.as_l_default -> R.string.as_l_default
+        Str.as_l_dont_ask -> R.string.as_l_dont_ask
+        Str.as_l_accept -> R.string.as_l_accept
+        Str.as_l_auto -> R.string.as_l_auto
+        Str.as_l_latest -> R.string.as_l_latest
+        Str.as_l_stable -> R.string.as_l_stable
+        Str.as_l_on_request -> R.string.as_l_on_request
+        Str.as_l_read_only -> R.string.as_l_read_only
+        Str.as_l_workspace_write -> R.string.as_l_workspace_write
+        Str.as_plugins -> R.string.as_plugins
+        Str.as_effort -> R.string.as_effort
+        Str.env_title -> R.string.env_title
+        Str.raw_fold -> R.string.raw_fold
+        Str.raw_unfold -> R.string.raw_unfold
+        Str.raw_bad_at -> R.string.raw_bad_at
+        Str.raw_no_fold -> R.string.raw_no_fold
+        Str.raw_save -> R.string.raw_save
+        Str.raw_check_title -> R.string.raw_check_title
+        Str.raw_undo_body -> R.string.raw_undo_body
+        Str.sf_title_claude -> R.string.sf_title_claude
+        Str.sf_title_codex -> R.string.sf_title_codex
+        Str.sf_row -> R.string.sf_row
+        Str.sf_row_body -> R.string.sf_row_body
+        Str.sf_search -> R.string.sf_search
+        Str.sf_source -> R.string.sf_source
+        Str.sf_scope_claude -> R.string.sf_scope_claude
+        Str.sf_scope_codex -> R.string.sf_scope_codex
+        Str.sf_when_unknown -> R.string.sf_when_unknown
+        Str.sf_not_set -> R.string.sf_not_set
+        Str.sf_not_set_default -> R.string.sf_not_set_default
+        Str.sf_on -> R.string.sf_on
+        Str.sf_off -> R.string.sf_off
+        Str.sf_set_mark -> R.string.sf_set_mark
+        Str.sf_set_hidden -> R.string.sf_set_hidden
+        Str.sf_in_file -> R.string.sf_in_file
+        Str.sf_hidden -> R.string.sf_hidden
+        Str.sf_hidden_json -> R.string.sf_hidden_json
+        Str.sf_hidden_keys -> R.string.sf_hidden_keys
+        Str.sf_remove -> R.string.sf_remove
+        Str.sf_add -> R.string.sf_add
+        Str.sf_item_hint -> R.string.sf_item_hint
+        Str.sf_item_remove -> R.string.sf_item_remove
+        Str.sf_change_action -> R.string.sf_change_action
+        Str.sf_open -> R.string.sf_open
+        Str.sf_own_screen_rules -> R.string.sf_own_screen_rules
+        Str.sf_ro_managed -> R.string.sf_ro_managed
+        Str.sf_ro_not_offered -> R.string.sf_ro_not_offered
+        Str.sf_ro_shape -> R.string.sf_ro_shape
+        Str.sf_ro_too_big -> R.string.sf_ro_too_big
+        Str.sf_not_read -> R.string.sf_not_read
+        Str.sf_not_in_schema -> R.string.sf_not_in_schema
+        Str.sf_asks_runs -> R.string.sf_asks_runs
+        Str.sf_asks_loosens -> R.string.sf_asks_loosens
+        Str.sf_asks_reach -> R.string.sf_asks_reach
+        Str.sf_asks_unknown -> R.string.sf_asks_unknown
+        Str.sf_p_needed -> R.string.sf_p_needed
+        Str.sf_p_short -> R.string.sf_p_short
+        Str.sf_p_long -> R.string.sf_p_long
+        Str.sf_p_form -> R.string.sf_p_form
+        Str.sf_p_nan -> R.string.sf_p_nan
+        Str.sf_p_whole -> R.string.sf_p_whole
+        Str.sf_p_below -> R.string.sf_p_below
+        Str.sf_p_above -> R.string.sf_p_above
+        Str.sf_p_not_over -> R.string.sf_p_not_over
+        Str.sf_p_many -> R.string.sf_p_many
+        Str.sf_p_few -> R.string.sf_p_few
+        Str.sf_p_twice -> R.string.sf_p_twice
+        Str.sf_none -> R.string.sf_none
+        Str.sf_err -> R.string.sf_err
+        Str.sf_state_malformed -> R.string.sf_state_malformed
+        Str.sf_state_unreadable -> R.string.sf_state_unreadable
         Str.you -> R.string.you
     }
 
@@ -1158,6 +1280,8 @@ val Plural.id: Int
         Plural.stats_said_minutes -> R.plurals.stats_said_minutes
         Plural.stats_sessions_count -> R.plurals.stats_sessions_count
         Plural.stats_streak_days -> R.plurals.stats_streak_days
+        Plural.raw_keys -> R.plurals.raw_keys
+        Plural.raw_items -> R.plurals.raw_items
         Plural.agent_tool_calls -> R.plurals.agent_tool_calls
         Plural.agents_count -> R.plurals.agents_count
         Plural.as_hidden -> R.plurals.as_hidden
@@ -1191,8 +1315,6 @@ val Plural.id: Int
         Plural.several_allow -> R.plurals.several_allow
         Plural.several_q -> R.plurals.several_q
         Plural.sm_for_all -> R.plurals.sm_for_all
-        Plural.stats_said_hours -> R.plurals.stats_said_hours
-        Plural.stats_said_minutes -> R.plurals.stats_said_minutes
         Plural.status_agents -> R.plurals.status_agents
         Plural.status_detail_commands -> R.plurals.status_detail_commands
         Plural.status_main_agents -> R.plurals.status_main_agents

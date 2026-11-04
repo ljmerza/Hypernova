@@ -4,7 +4,7 @@
 // - A rule's text leaves only through maskedRule, each secret a numbered placeholder. An edit that keeps one keeps the secret.
 // - The server decides what loosens. Without `confirmed` that's a 403 whose words say what the change does: a one-tap confirm, by
 //   the owner's choice no fingerprint, so nothing loosens by accident rather than to stop someone holding the device.
-// - One writer: openForEdit, jsonListEdit and writeEdit, as PUT /v1/agents/settings for any other key. Only a rule's bytes change.
+// - One writer: openForEdit, jsonListEdit and commitEdit, as PUT /v1/agents/settings for any other key. Only a rule's bytes change.
 //
 // Codex has no such lists: `approval_policy` and `sandbox_mode` are on its settings, and `~/.codex/rules` holds Starlark programs.
 // Only how many files are there is read, never what's in them.
@@ -12,7 +12,7 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { isTable, codexHome, parseTable, readCapped } from './agent-settings.ts'
-import { EditRefused, fieldsOf, jsonListEdit, openForEdit, RULES_KEY, rulesUndo, writeEdit, type Dirs } from './agent-settings-edit.ts'
+import { commitEdit, EditRefused, fieldsOf, fileOf, jsonListEdit, openForEdit, RULES_KEY, rulesUndo, type Dirs } from './agent-settings-edit.ts'
 import { broadWords, covers, judgeRule, LIST_WORDS, maskedRule, restoredRule, RULE_LISTS, type RuleList } from './rule-text.ts'
 import { MASK } from './mcp-view.ts'
 import { CLAUDE_DIR, log } from './util.ts'
@@ -183,7 +183,8 @@ export function changeRule(body: Record<string, unknown>, dirs: Dirs = {}, testH
   const expected = body.expected
   if (expected !== null && typeof expected !== 'string') throw new EditRefused(400, 'bad_expected', 'Say which version of the file this is for.')
   const w = wanted(body.rule)
-  const { file, cur, text } = openForEdit('claude', dirs, expected)
+  const file = fileOf('claude', dirs)
+  const { cur, text } = openForEdit('claude', file, expected)
   const doc = text === null ? {} : (JSON.parse(text) as Record<string, unknown>)
   const from = stored(doc, w.list)
   if (!Array.isArray(from)) throw new EditRefused(409, 'unsupported_shape', 'That list isn’t a list in the file, so Claude Code is skipping the whole file. Fix it on the server.')
@@ -223,7 +224,7 @@ export function changeRule(body: Record<string, unknown>, dirs: Dirs = {}, testH
   }
   const asks = loosening(w, before, after)
   if (asks && body.confirmed !== true) throw new EditRefused(403, 'confirm_needed', asks)
-  const hash = writeEdit('claude', file, cur, next, expected, RULES_KEY, { key: RULES_KEY, state: 'unset' }, null, testHooks)
+  const hash = commitEdit('claude', file, cur, expected, Buffer.from(next, 'utf8'), { key: RULES_KEY, before: { key: RULES_KEY, state: 'unset' }, after: null }, testHooks)
   // Which list and what was done, never a rule's text: it can hold a secret.
   log(`agent settings: claude rules ${w.op} ${w.list}${w.op === 'move' ? ` -> ${w.to}` : ''}${asks ? ' (loosens, confirmed)' : ''}`)
   return { ok: true as const, agent: 'claude' as const, key: RULES_KEY, value: null, changed: true, hash, loosened: !!asks }

@@ -3,9 +3,10 @@
 // threat and the limits: docs/SECURITY-MODEL.md). Everything else about these files stays read-only:
 // always.ts still leaves the rules to Claude Code.
 //
-// The server decides. EDITABLE is what can be set, and each key's values are the only ones accepted,
-// so a bypass mode, `approval_policy = "never"` and `danger-full-access` can't get here, whatever a
-// client sends. A file that already holds one shows it and can move off it, and Undo won't put it back.
+// The server decides. EDITABLE is what the list screens can set, and each key's values are the only ones
+// accepted, so a bypass mode, `approval_policy = "never"` and `danger-full-access` can't get here, whatever a
+// client sends. A file that already holds one shows it and can move off it, and Undo won't put it back. The
+// form of every setting (agent-settings-form.ts) writes through this file's [commitEdit] too: no second writer.
 //
 // A write changes the bytes of one value and nothing else. JSON and TOML alike are edited in place by
 // position, never parsed and written back, so hooks, env, comments and order can't change; each edit
@@ -99,7 +100,7 @@ const failed = () => new EditRefused(500, 'write_failed', 'That couldn’t be wr
 /** A settings file past this isn't read (agent-settings.ts). */
 const FILE_MAX = 4 * 1024 * 1024
 const FILES: Record<Agent, string> = { claude: 'settings.json', codex: 'config.toml' }
-const fileOf = (agent: Agent, dirs: Dirs) => join(agent === 'claude' ? (dirs.claude ?? CLAUDE_DIR) : (dirs.codex ?? codexHome()), FILES[agent])
+export const fileOf = (agent: Agent, dirs: Dirs) => join(agent === 'claude' ? (dirs.claude ?? CLAUDE_DIR) : (dirs.codex ?? codexHome()), FILES[agent])
 export type Dirs = { claude?: string; codex?: string; claudeConfig?: string }
 
 export const sha256 = (b: Buffer | string) => createHash('sha256').update(b).digest('hex')
@@ -143,9 +144,9 @@ export function textOf(bytes: Buffer): string | null {
   return Buffer.from(text, 'utf8').equals(bytes) ? text : null
 }
 
-const isTable = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+export const isTable = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 
-function parseJson(text: string): Record<string, unknown> | null {
+export function parseJson(text: string): Record<string, unknown> | null {
   try {
     const doc = JSON.parse(text)
     return isTable(doc) ? doc : null
@@ -153,7 +154,7 @@ function parseJson(text: string): Record<string, unknown> | null {
     return null
   }
 }
-function parseToml(text: string): TomlStatement[] | null {
+export function parseToml(text: string): TomlStatement[] | null {
   const out: TomlStatement[] = []
   try {
     scanToml(text, () => {}, (s) => out.push(s))
@@ -313,6 +314,17 @@ export function jsonEdit(t: string, path: readonly string[], value: Value): stri
  * that leaves empty). The same care as [jsonEdit]: only those bytes change, and what comes out is compared.
  */
 export function jsonEditPath(t: string, path: readonly string[], value: Value | number | readonly string[] | null): string {
+  return jsonEditAny(t, path, value, false)
+}
+
+/** One level of [v] laid out with [unit], starting at a line's [at] indent; on one line where the file writes its objects that way. */
+function layout(v: unknown, unit: string, at: string, eol: string, inline: boolean): string {
+  if (inline || v === null || typeof v !== 'object') return JSON.stringify(v)
+  return JSON.stringify(v, null, unit).replaceAll('\n', `${eol}${at}`)
+}
+
+/** [jsonEditPath], and with [any] it also takes an object or a list where one already stands: the whole of that one value's bytes. */
+export function jsonEditAny(t: string, path: readonly string[], value: unknown, any = true): string {
   const before = parseJson(t)
   if (!before) throw malformed()
   const eol = t.includes('\r\n') ? '\r\n' : '\n'
@@ -345,8 +357,9 @@ export function jsonEditPath(t: string, path: readonly string[], value: Value | 
     else next = splice(t, members[i - 1]!.valueTo, m.valueTo, '')
   } else if (whole) {
     const m = found.at(-1)!
-    if (t[m.valueFrom] === '{' || (t[m.valueFrom] === '[' && !Array.isArray(value))) throw shape()
-    next = splice(t, m.valueFrom, m.valueTo, JSON.stringify(value))
+    if (!any && (t[m.valueFrom] === '{' || (t[m.valueFrom] === '[' && !Array.isArray(value)))) throw shape()
+    const lead = leadOf(t, m.keyFrom)
+    next = splice(t, m.valueFrom, m.valueTo, any ? layout(value, unit, indentOf(lead), eol, !lead.includes('\n')) : JSON.stringify(value))
   } else {
     const { open, members, close } = levels[found.length]!
     const last = members.at(-1)
@@ -356,7 +369,7 @@ export function jsonEditPath(t: string, path: readonly string[], value: Value | 
     const lead = last ? leadOf(t, last.keyFrom) : aboveLead.includes('\n') ? aboveLead + (above ? unit : '  ') : ''
     const inline = !lead.includes('\n')
     const nest = (names: readonly string[], at: string): string => {
-      const body = names.length === 1 ? JSON.stringify(value) : `{${inline ? '' : at + unit}${nest(names.slice(1), at + unit)}${inline ? '' : at}}`
+      const body = names.length === 1 ? (any ? layout(value, unit, indentOf(at), eol, inline) : JSON.stringify(value)) : `{${inline ? '' : at + unit}${nest(names.slice(1), at + unit)}${inline ? '' : at}}`
       return `${JSON.stringify(names[0])}${colon}${body}`
     }
     const member = nest(path.slice(found.length), lead)
@@ -384,7 +397,7 @@ export function jsonEditPath(t: string, path: readonly string[], value: Value | 
  * a new line at the end of the top-level section, before the first table. Refused (`unsupported_shape`)
  * unless it's a plain string or boolean on one line, directly at the top.
  */
-export function tomlEdit(t: string, key: string, value: string): string {
+export function tomlEdit(t: string, key: string, value: string | boolean | number): string {
   const statements = parseToml(t)
   if (!statements) throw malformed()
   const quoted = JSON.stringify(value)
@@ -405,7 +418,9 @@ export function tomlEdit(t: string, key: string, value: string): string {
   }
   let next: string
   if (target) {
-    if (target.value === OTHER || t.slice(target.valueFrom, target.valueTo).includes('\n')) throw shape()
+    const bytes = t.slice(target.valueFrom, target.valueTo)
+    // A number the reader hands back as OTHER may become another number; nothing else of OTHER's moves.
+    if ((target.value === OTHER && !(typeof value === 'number' && TOML_NUMBER.test(bytes))) || bytes.includes('\n')) throw shape()
     next = splice(t, target.valueFrom, target.valueTo, quoted)
   } else {
     const eol = t.includes('\r\n') ? '\r\n' : '\n'
@@ -427,7 +442,39 @@ export function tomlEdit(t: string, key: string, value: string): string {
     throw shape()
   }
   if (!isDeepStrictEqual(after.filter((e) => !isTarget(e)), entries(t).filter((e) => !isTarget(e)))) throw shape()
-  if (!after.some((e) => isTarget(e) && e[1] === value)) throw shape()
+  if (!after.some((e) => isTarget(e) && e[1] === (typeof value === 'number' ? OTHER : value))) throw shape()
+  return next
+}
+
+/** A plain decimal number as a TOML value, the only numbers [tomlEdit] replaces or the form reads. */
+export const TOML_NUMBER = /^[+-]?\d+(?:\.\d+)?$/
+
+/** [t] without the top-level [key]'s line: refused unless it's a plain value on one line, directly at the top. */
+export function tomlRemove(t: string, key: string): string {
+  const statements = parseToml(t)
+  if (!statements) throw malformed()
+  const lines = statements.filter((s): s is Extract<TomlStatement, { kind: 'key' }> => s.kind === 'key' && !s.table.length && s.key[0] === key)
+  if (statements.some((s) => s.kind === 'table' && s.path[0] === key)) throw shape()
+  const target = lines[0]
+  if (!target) return t
+  if (lines.length !== 1 || target.key.length !== 1) throw shape()
+  const bytes = t.slice(target.valueFrom, target.valueTo)
+  if (bytes.includes('\n') || (target.value === OTHER && !TOML_NUMBER.test(bytes))) throw shape()
+  const next = splice(t, t.lastIndexOf('\n', target.valueFrom) + 1, target.lineEnd, '')
+  const others = (text: string) => {
+    const out: [string[], TomlValue | undefined][] = []
+    scanToml(text, (path, v) => {
+      if (!(path.length === 1 && path[0] === key)) out.push([path, v])
+    })
+    return out
+  }
+  let after: ReturnType<typeof others>
+  try {
+    after = others(next)
+  } catch {
+    throw shape()
+  }
+  if (!isDeepStrictEqual(after, others(t))) throw shape()
   return next
 }
 
@@ -585,9 +632,9 @@ const inLog = (v: ShownValue) => (v.state === 'set' ? String(v.value) : v.state 
 export const RULES_KEY = 'permissions.rules'
 
 /** What the last change wrote, for Undo. Its values have been checked, as the phone's are. */
-type Last = { wrote: string; backup: string | null; key: string; before: ShownValue; after: Value | null }
+export type Last = { wrote: string; backup: string | null; key: string; before: ShownValue; after: Value | null; form?: true }
 
-function readLast(agent: Agent): Last | null {
+export function readLast(agent: Agent): Last | null {
   try {
     const l = JSON.parse(readFileSync(lastFile(agent), 'utf8'))
     return isTable(l) && typeof l.wrote === 'string' && typeof l.key === 'string' && (l.backup === null || typeof l.backup === 'string') && isTable(l.before) ? (l as unknown as Last) : null
@@ -764,6 +811,63 @@ export async function settingsReply(models: ModelList, dirs: Dirs = {}, effortMo
 
 export type Change = { ok: true; agent: Agent; key: string; value: Value | null; changed: boolean; hash: string; loosened: boolean; undo: UndoOffer | null }
 
+/**
+ * The file as it stands for an edit, or the refusal: the hash a client read, then what a rename would
+ * otherwise walk over. The list's route and the form's take the same checks.
+ */
+export function openForEdit(agent: Agent, file: string, expected: string | null): { cur: Current; text: string | null } {
+  const cur = readCurrent(file)
+  if ((cur?.hash ?? null) !== expected) throw changed()
+  if (!cur && !existsSync(dirname(file))) throw new EditRefused(409, 'no_folder', 'The agent’s settings folder isn’t there on the server.')
+  const text = cur ? textOf(cur.bytes) : null
+  if (cur && text === null) throw shape()
+  if (text !== null && !(agent === 'claude' ? parseJson(text) : parseToml(text))) throw malformed()
+  // A rename would replace a read-only file without a word: whoever made it so meant it.
+  if (cur) {
+    try {
+      accessSync(file, constants.W_OK)
+    } catch {
+      throw new EditRefused(409, 'file_read_only', 'That file is read-only on the server. Nothing was written.')
+    }
+  }
+  return { cur, text }
+}
+
+/**
+ * The one write: [next] into [file], the old bytes backed up first, the hash looked at again last thing, and what's
+ * needed for Undo kept. Returns the new hash. Its callers have checked everything else, and log for themselves.
+ */
+export function commitEdit(agent: Agent, file: string, cur: Current, expected: string | null, next: Buffer, last: Pick<Last, 'key' | 'before' | 'after' | 'form'>, testHooks: { beforeRename?: () => void } = {}): string {
+  const wrote = sha256(next)
+  let backup = null as string | null
+  try {
+    writeAtomic(file, next, cur?.stat ?? null, () => {
+      if (cur) backup = writeBackup(agent, cur.bytes)
+      testHooks.beforeRename?.()
+      // Last thing before the rename: anyone else's write since the read stands, and this one doesn't happen.
+      if ((readCurrent(file)?.hash ?? null) !== expected) {
+        if (backup) rmSync(join(backupDir(), backup), { force: true })
+        backup = null
+        throw changed()
+      }
+    })
+  } catch (e) {
+    if (backup) rmSync(join(backupDir(), backup), { force: true })
+    if (e instanceof EditRefused) throw e
+    log('agent settings: write failed', agent, last.key, (e as NodeJS.ErrnoException).code ?? 'error')
+    throw failed()
+  }
+  // The file is written, whatever comes next: a failure here only costs the Undo.
+  try {
+    mkdirSync(backupDir(), { recursive: true, mode: 0o700 })
+    saveLast(agent, { wrote, backup, ...last })
+    pruneBackups(agent)
+  } catch (e) {
+    log('agent settings: backup bookkeeping failed', agent, (e as NodeJS.ErrnoException).code ?? 'error')
+  }
+  return wrote
+}
+
 /** The checks that need no file: anything off the list stops here. */
 function checked(body: unknown): { rule: Rule; agent: Agent; key: string; value: Value | null; expected: string | null } {
   if (!isTable(body)) throw new EditRefused(400, 'bad_request', 'Send an agent, a key, a value and what you expect the file to be.')
@@ -781,59 +885,6 @@ function checked(body: unknown): { rule: Rule; agent: Agent; key: string; value:
   return { rule, agent, key: rule.key, value, expected }
 }
 
-/** The file a change is for, as it is now, or why it can't be changed. */
-export function openForEdit(agent: Agent, dirs: Dirs, expected: string | null): { file: string; cur: Current; text: string | null } {
-  const file = fileOf(agent, dirs)
-  const cur = readCurrent(file)
-  if ((cur?.hash ?? null) !== expected) throw changed()
-  if (!cur && !existsSync(dirname(file))) throw new EditRefused(409, 'no_folder', 'The agent’s settings folder isn’t there on the server.')
-  const text = cur ? textOf(cur.bytes) : null
-  if (cur && text === null) throw shape()
-  if (text !== null && !(agent === 'claude' ? parseJson(text) : parseToml(text))) throw malformed()
-  // A rename would replace a read-only file without a word: whoever made it so meant it.
-  if (cur) {
-    try {
-      accessSync(file, constants.W_OK)
-    } catch {
-      throw new EditRefused(409, 'file_read_only', 'That file is read-only on the server. Nothing was written.')
-    }
-  }
-  return { file, cur, text }
-}
-
-/** [next] into [file], with its backup and what Undo needs. The one write of a change through this route. Answers the new hash. */
-export function writeEdit(agent: Agent, file: string, cur: Current, nextText: string, expected: string | null, key: string, before: ShownValue, after: Value | null, testHooks: { beforeRename?: () => void } = {}): string {
-  const next = Buffer.from(nextText, 'utf8')
-  const wrote = sha256(next)
-  let backup = null as string | null
-  try {
-    writeAtomic(file, next, cur?.stat ?? null, () => {
-      if (cur) backup = writeBackup(agent, cur.bytes)
-      testHooks.beforeRename?.()
-      // Last thing before the rename: anyone else's write since the read stands, and this one doesn't happen.
-      if ((readCurrent(file)?.hash ?? null) !== expected) {
-        if (backup) rmSync(join(backupDir(), backup), { force: true })
-        backup = null
-        throw changed()
-      }
-    })
-  } catch (e) {
-    if (backup) rmSync(join(backupDir(), backup), { force: true })
-    if (e instanceof EditRefused) throw e
-    log('agent settings: write failed', agent, key, (e as NodeJS.ErrnoException).code ?? 'error')
-    throw failed()
-  }
-  // The file is written, whatever comes next: a failure here only costs the Undo.
-  try {
-    mkdirSync(backupDir(), { recursive: true, mode: 0o700 })
-    saveLast(agent, { wrote, backup, key, before, after })
-    pruneBackups(agent)
-  } catch (e) {
-    log('agent settings: backup bookkeeping failed', agent, (e as NodeJS.ErrnoException).code ?? 'error')
-  }
-  return wrote
-}
-
 /**
  * PUT /v1/agents/settings. Everything on the file happens in one synchronous stretch, so two phones
  * can't interleave here; another program can only be caught by [hash] looked at again last thing.
@@ -847,14 +898,15 @@ export async function changeSetting(body: unknown, models: () => Promise<ModelLi
     if (typeof value !== 'string' || !modelIdFits(value) || !list.some((m) => m.value === value)) throw new EditRefused(403, 'value_not_allowed', 'That value can’t be chosen from a phone.')
   }
 
-  const { file, cur, text } = openForEdit(agent, dirs, expected)
+  const file = fileOf(agent, dirs)
+  const { cur, text } = openForEdit(agent, file, expected)
 
   const before: ShownValue = text === null ? { key, state: 'unset' } : currentValue(agent, text, key)
   const loosened = loosens(key, before, value)
   if ((before.state === 'set' && before.value === value && cur) || (value === null && before.state === 'unset')) {
     return { ok: true, agent, key, value, changed: false, hash: cur?.hash ?? '', loosened: false, undo: cur ? undoOffer(agent, cur.hash) : null }
   }
-  const wrote = writeEdit(agent, file, cur, edited(agent, text, key, value), expected, key, before, value, testHooks)
+  const wrote = commitEdit(agent, file, cur, expected, Buffer.from(edited(agent, text, key, value), 'utf8'), { key, before, after: value }, testHooks)
   log(`agent settings: ${agent} ${key} ${inLog(before)} -> ${value === null ? '(not set)' : String(value)}${loosened ? ' (loosens)' : ''}`)
   return { ok: true, agent, key, value, changed: true, hash: wrote, loosened, undo: undoOffer(agent, wrote) }
 }
@@ -893,6 +945,13 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
 
   const to = last.before.state === 'set' ? last.before.value : null
   const loosened = rules ? rulesAsk.length > 0 : loosens(last.key, last.after === null ? { key: last.key, state: 'unset' } : { key: last.key, state: 'set', value: last.after }, to)
+  const hash = restoreLast(agent, file, cur, last)
+  log(`agent settings: ${agent} ${last.key} ${last.after === null ? '(not set)' : String(last.after)} -> ${inLog(last.before)} (undo${loosened ? ', loosens' : ''})`)
+  return { ok: true, agent, key: last.key, hash, loosened }
+}
+
+/** Puts the file back as [last] found it: its backup, or nothing if that change made the file. The new hash, null with no file. */
+export function restoreLast(agent: Agent, file: string, cur: NonNullable<Current>, last: Last): string | null {
   let hash: string | null = null
   try {
     if (last.backup === null) {
@@ -914,6 +973,5 @@ export function undoChange(body: unknown, dirs: Dirs = {}): Undone {
     throw failed()
   }
   rmSync(lastFile(agent), { force: true })
-  log(`agent settings: ${agent} ${last.key} ${last.after === null ? '(not set)' : String(last.after)} -> ${inLog(last.before)} (undo${loosened ? ', loosens' : ''})`)
-  return { ok: true, agent, key: last.key, hash, loosened }
+  return hash
 }
