@@ -89,7 +89,7 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 
 **A new string in the shared drawing** is a line in `Str.kt` (or `Plural`) and in `StringIds.kt`, as for the data layer, and `WordsTest` holds it to the phone's text. `:app` and `:desktop` are the module's Kotlin friends, as `:app` is `:shared`'s.
 
-**What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, Always and This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
+**What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
 
 ## The rules' checks (2026-11-03)
 
@@ -114,6 +114,7 @@ cd android && ./gradlew :app:writeRuntimeClasspath   # after a chosen change: co
 | `phone-desktop-same-name` | A top-level composable or class in both shells' `ui/`: a copy that never went through `sharedui`. A window's root and anything called `...Screen` don't count, as each system lays those out its own way |
 | `same-file-same-package` | The same file name and `package` in two of `app`, `shared`, `sharedui` and `desktop`, main code only: they clash at dex as the same `XKt`. Tests may: each target's `HubRig.kt` is on purpose |
 | `app-classpath` | `classpath-debug.txt` or `classpath-release.txt` missing from `android/app`, or JetBrains' `foundation` or `animation` in them (`animation-core` stays: Haze brings it). `:app:checkRuntimeClasspath` fails when either list differs from the build's graph, versions included |
+| `no-biometric` | `BiometricPrompt`, `BiometricManager`, `FingerprintManager`, `OwnerCheck`, `android.hardware.biometrics`, `androidx.biometric`, a key that needs the screen lock or a credential prompt, in any module's code or tests; `USE_BIOMETRIC`, `USE_FINGERPRINT` or `androidx.biometric` in the manifest, the build files or the classpath lists (CLAUDE.md, "No fingerprints or screen locks"). Comments and strings don't count. Notifications' `setAuthenticationRequired` isn't one of these: `docs/DECISIONS.md`, "No fingerprints or screen locks" |
 | `previews-ignored` | `.*-preview/` gone from `.gitignore` |
 | `allowlist` | A line in `ALLOWED` that's no longer a breach, or whose row in `docs/LATER.md` doesn't name it |
 
@@ -207,7 +208,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 |---|---|---|
 | Chat (transcript, prompt box, queue, offline queue, held prompts, rewind, message menu, attachments, quick prompts) | Partly | The transcript, the box, the queue and the offline queue are there, the phone's own drawing (`:sharedui`). No rewind, message menu, attachments or quick prompts: "The shared drawing" lists what isn't |
 | Live terminal | Not yet | Not begun |
-| Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always also needs an owner check the desktop hasn't got |
+| Answer a question or a plan, Always, Allow these N | Partly | Questions and plans are answered in the chat. Always is on an ask's card beside its whole command, after a confirm with Claude Code's suggested rule and where it goes, not the phone's sheet for editing them. No Allow these N yet |
 | Session sheet: what the list already knows (folder, model, mode, where it runs, agents, queue, context, times) | There | In the pane |
 | Background commands ("1 shell"): the Agents tab's list and the count | Not yet | `:shared` has them (`AgentBoard.shells`, `Session.shellsRunning`); needs the agents tab or a row in the pane |
 | Session sheet: switch model, effort or mode; Blocked; rules in effect; why it asked; agents tab; commands tab; git; another provider or agent | Not yet | Each needs a request of its own |
@@ -224,7 +225,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 
 | Phone | Desktop | |
 |---|---|---|
-| Prompt, folder and folder browser, new project, agent, mode | There | In the right pane. Skills after a prompt reach the server as typed. Auto asks to think twice, as on the phone, without its story's link. **No Bypass:** it waits for an owner check the desktop hasn't got |
+| Prompt, folder and folder browser, new project, agent, mode | There | In the right pane. Skills after a prompt reach the server as typed. Auto and Bypass ask to think twice, as on the phone, without the story's link. Bypass is chosen each time and never kept |
 | Model and effort pickers | Not yet | It starts on the default, and says so |
 | The "/" list, attachments | Not yet | |
 | Dictation | Not meant to be, for now | Desktop dictation is research only (below, "Desktop dictation") |
@@ -252,7 +253,6 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | The widget | Not meant to be | Android's home screen |
 | Haptics, the pulse of a needs-you mark, the grain, blur | Not meant to be | No motor, and left out of Atlas here (rule 8 of "The desktop app") |
 | Read aloud | Not yet | `SpeechOutput` is null here |
-| Fingerprint or screen lock (`OwnerCheck`) | Not yet | The desktop has no check of its own, so what needs one stays on the phone |
 | The app's update offer | Not meant to be | A server offers the phone's APK. The desktop updates by its packages (docs/RELEASING.md) |
 | Glasses | Not meant to be | Lens has left this repository, and the phone has no screen for them now |
 

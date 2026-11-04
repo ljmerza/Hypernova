@@ -1336,7 +1336,7 @@ AutomationInput = {
   confirmBypass?: true,         // required when any start step is in bypassPermissions
   confirmPaid?: true,           // required when any start or continue step is on a provider that costs money
                                 // (`paid`), also when the session it continues is on one
-  confirmShell?: true,          // required when steps has a shell step (The fingerprint)
+  confirmShell?: true,          // required when steps has a shell step (The confirm)
 }
 ```
 
@@ -2585,7 +2585,7 @@ Errors). All take the bearer token except the local fire route.
   `bad_action` for `action` `{kind: "workflow"}`, which only an automation that already exists can
   keep
 - **Rules:** `token` is a webhook trigger's, only in the answer to the save that made it (show it
-  once). Validation, `confirmBypass`, `confirmPaid` and `confirmShell`: see The fingerprint and
+  once). Validation, `confirmBypass`, `confirmPaid` and `confirmShell`: see The confirm and
   Never on paid usage.
 
 #### GET /v1/automations/{id}
@@ -2996,8 +2996,8 @@ An older daemon answers 404 to each. The first three: see Agent settings.
   that isn't there yet. `value` may be null only for a model's effort, to take it out.
 - **Answer:** `200 SettingChange`. A change goes out as `{t:"agent_settings"}`.
 - **Refusals:** see Agent settings, "Changing one".
-- **Rules:** one key of the shorter list, or a model's effort. The server flags `loosened`; asking for
-  the owner's fingerprint is the client's part.
+- **Rules:** one key of the shorter list, or a model's effort. The server flags `loosened`; confirming with
+  the owner is the client's part.
 
 #### POST /v1/agents/settings/undo
 
@@ -3348,7 +3348,7 @@ A paired phone only, each of them: anything else is 401 `unauthorized`. An older
 
 - **Body:** `{agent}`
 - **Answer:** `200 AgentVersion`
-- **Rules:** no fingerprint: it installs nothing. Within 5 minutes of the last one it answers from that one. Not installed answers `installed: false`.
+- **Rules:** no confirm: it installs nothing. Within 5 minutes of the last one it answers from that one. Not installed answers `installed: false`.
 
 #### POST /v1/agents/version/update
 
@@ -4358,8 +4358,9 @@ wins: when the terminal answers, the daemon sees the tool finish and sends `appr
 Answers (`ApprovalAnswer.decision`, `POST /v1/approvals/{id}`):
 
 - `allow`, `deny`: this call only.
-- `always`: allows and adds a permission rule (see "What Always covers"). The Android app asks for
-  the fingerprint or the screen lock first; its notifications and widget offer Allow and Deny only.
+- `always`: allows and adds a permission rule (see "What Always covers"). A client asks first: the
+  Android app's Always sheet, or a confirm with the whole command where there's no rule to show; the
+  desktop's confirm, with the rule and where it goes. Notifications and the widget offer Allow and Deny only.
 - `session` (only where `canSession`): allows that tool for the rest of the session: this approval,
   the same tool's other approvals waiting in that session (they resolve as allowed), and later ones,
   which the daemon answers without asking, subagents included. Claude Code gets a session-only rule,
@@ -5336,7 +5337,7 @@ placeholders' values whole).
 - The answer is the step's output (`{answer}`, `{prev}`); a guard `{on: "answer", text: "Approve"}`
   on the next step acts on it.
 
-##### The fingerprint
+##### The confirm
 
 Saving (POST or PUT, Duplicate too) an automation with a shell step needs `confirmShell: true` every
 time, and one with a start step in `bypassPermissions` needs `confirmBypass: true` every time (400
@@ -5344,11 +5345,11 @@ time, and one with a start step in `bypassPermissions` needs `confirmBypass: tru
 as they are (`{kind: "workflow"}`) included (its field `action`): the trigger or the name may be
 what changed.
 
-Both are the client's word that it asked: the daemon can't see a fingerprint. A client asks first.
-The Android app asks for the fingerprint or the screen lock (`BiometricPrompt`,
-`BIOMETRIC_STRONG or DEVICE_CREDENTIAL`; "Let an automation run commands" for a shell step, "Let an
-automation run without asking" for No asking, the automation's name under it). One check covers both
-flags. Nothing else asks: switching on or off, Run now, Retry, Stop, answering an ask, firing, a new
+Both are the client's word that it asked: the daemon can't see who pressed what. A client asks first.
+The Android app shows a confirm saying what it does ("Let an automation run commands?" for a shell step,
+with the commands whole, "Let an automation run without asking?" for No asking, with the automation's
+name). One confirm covers both flags. No client asks for a fingerprint or a screen lock (owner,
+2026-11-04: docs/DECISIONS.md, "No fingerprints or screen locks"). Nothing else asks: switching on or off, Run now, Retry, Stop, answering an ask, firing, a new
 token and deleting don't. `confirmPaid` stays a plain confirmation.
 
 ##### What the daemon enforces itself
@@ -5724,7 +5725,7 @@ folder; an older `<config dir>/.config.json` with something in it wins, as it do
 | | `web_search` | `disabled`, `cached`, `indexed`, `live` |
 
 `loosened` says this allows more than before (`loosens()`; each choice's `loosens` is the same answer in
-advance). The server flags it and logs it; asking for the owner's fingerprint is the client's part.
+advance). The server flags it and logs it; confirming with the owner is the client's part.
 
 | Status | Code | When (nothing is written in any of them) |
 |---|---|---|
@@ -5754,7 +5755,7 @@ take it out (a table left empty goes too; the file's top level stays). `expected
 `{t:"agent_settings"}` and Undo are as for every other key; `undo.to` of null means not set. Off that shape,
 or a model id with characters outside letters, digits, `.`, `_`, `:` and `-`, or a name every object already
 has: 403 `key_not_editable`. Another word: 403 `value_not_allowed`, and null on any other key is the same.
-Nothing here loosens anything, so no fingerprint.
+Nothing here loosens anything, so no confirm.
 
 #### The write
 
@@ -5776,7 +5777,7 @@ server doesn't know. Those stay in the backup, for doing by hand.
 #### The Android app
 
 `ui/settings/AgentSettings.kt`. A key it has no words for shows its raw name. A row in `editable` opens a
-picker of its choices; one whose choice `loosens` confirms and asks `OwnerCheck` first. On a 404 to the GET it
+picker of its choices; one whose choice `loosens` confirms first. On a 404 to the GET it
 says the server needs updating; on a 404 to a change, the same, and its rows stay view-only. The MCP row groups
 `claude.mcp`: "On this server" (user), then each project's by name (local and project), with 12 names per
 group, 12 projects and "n more". An older daemon's reply has no `mcp`: the row shows `summary.mcpServers`. An
@@ -5896,7 +5897,7 @@ form is on `claude mcp add-json`'s command line for a moment.
 #### What a change runs
 
 Adding or changing a stdio server, approving a project's, and an Undo that puts one back all run a program on the
-server, sooner or later. **The server can't see a fingerprint: `confirmRun` is the phone's claim of one**, as
+server, sooner or later. **The server can't see who pressed what: `confirmRun` is the client's claim of a confirm**, as
 `confirmShell` is for an automation, and it refuses with 403 `confirm_run` without it. It asks when `command`, `args` or `env`
 would change, or when a server becomes stdio; not for an http or sse server, a remove, a toggle or a reconnect.
 
@@ -6059,7 +6060,7 @@ Agents & providers › an agent's Settings › Version, one server at a time. Wh
 | Codex, "manual or unknown", or a later word | | Says why, and points at its guide |
 | Codex older than `CODEX_MIN` | | Neither `doctor` nor `update` runs, as 0.39.0 takes both for a prompt. npm's: `npm install -g @openai/codex@latest` |
 
-**An update** needs `confirmRun`, as a plugin's does: the phone shows what changes and what happens to what's running on a confirm, then asks for the fingerprint. The server sees only the claim. It needs a check first, so the confirm has something to say. One at a time per program: 409 `update_running`, whichever phone asks.
+**An update** needs `confirmRun`, as a plugin's does: the phone shows what changes and what happens to what's running on a confirm. The server sees only the claim. It needs a check first, so the confirm has something to say. One at a time per program: 409 `update_running`, whichever phone asks.
 
 It runs apart from any connection and from the daemon: its own process group, its output to `<support>/agent-updates/<agent>.log` (0600), which is read for `job.output` and deleted at the end. So leaving, a dropped connection or the daemon restarting doesn't stop it (the service's `KillMode=process`), and a new daemon finds it by its pid in `<support>/agent-updates.json` and waits. After 15 minutes the group gets SIGTERM, then SIGKILL.
 
@@ -6878,7 +6879,7 @@ exception is "Agents' plans", below, and it is for reading only.
 as `mac.files`, `/local/status` as `files`, and the admin token changes it with
 `POST /local/settings {browseOutsideProjects}`. A change is saved, goes out at once as
 `{t:"files", files}`, and each session whose `browsable` it changes goes out as `{t:"session"}`. The
-Android app asks for the fingerprint or the screen lock before turning it on (not off).
+Android app confirms, saying what it opens, before turning it on (not off).
 
 #### Files with keys
 
