@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "error": {
+    "code": "bad_value",
+    "message": "cleanupPeriodDays: the least it takes is 1."
+  }
+}

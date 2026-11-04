@@ -40,6 +40,7 @@ import { extrasRoute } from './agent-extras.ts'
 import { startAgentUpdates, versionRoute } from './agent-update.ts'
 import { mcpRoute } from './mcp-routes.ts'
 import { changeSetting, settingsReply, undoChange, type ModelList } from './agent-settings-edit.ts'
+import { changeFormSetting, settingsForm, undoFormChange } from './agent-settings-form.ts'
 import { getStats, noteApproval, notePrompt, parseRange } from './stats.ts'
 import { getBattery } from './battery.ts'
 import { refreshUsage } from './usage-probe.ts'
@@ -654,6 +655,26 @@ async function api(c: Ctx): Promise<void> {
   if (path === '/v1/agents/settings/undo' && m === 'POST') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
     const r = undoChange(await readJsonBody(req))
+    afterSettingChange(r.agent, r.key)
+    return json(res, 200, r)
+  }
+  // Every one of the agents' settings as a form, from their own schemas (agent-settings-form.ts). Its own route: 142 rows' words
+  // don't ride along each time the list screens read the short list.
+  if (path === '/v1/agents/settings/form' && m === 'GET') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    const agent = url.searchParams.get('agent')
+    if (agent !== 'claude' && agent !== 'codex') throw new HttpError(400, 'bad_agent', 'That isn’t an agent with settings here.')
+    return json(res, 200, await settingsForm(agent, settingsModels))
+  }
+  if (path === '/v1/agents/settings/form' && m === 'PUT') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
+    const r = await changeFormSetting(await readJsonBody(req), settingsModels)
+    if (r.changed) afterSettingChange(r.agent, r.key)
+    return json(res, 200, r)
+  }
+  if (path === '/v1/agents/settings/form/undo' && m === 'POST') {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
+    const r = undoFormChange(await readJsonBody(req))
     afterSettingChange(r.agent, r.key)
     return json(res, 200, r)
   }

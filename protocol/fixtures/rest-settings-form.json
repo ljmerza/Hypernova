@@ -1,0 +1,245 @@
+{
+  "agent": "claude",
+  "scope": "user",
+  "source": {
+    "from": "SchemaStore (https://github.com/SchemaStore/schemastore)",
+    "licence": "Apache-2.0",
+    "fetched": "2026-11-04",
+    "checkedAgainst": "Claude Code 2.1.318"
+  },
+  "placeholder": "<hidden on the server>",
+  "state": "ok",
+  "hash": "file-hash",
+  "whyNot": null,
+  "undo": null,
+  "rows": [
+    {
+      "key": "permissions.allow",
+      "group": "perms",
+      "groupTitle": "Permissions and safety",
+      "title": "Allow",
+      "description": "List of permission rules for allowed operations",
+      "asks": null,
+      "control": "link",
+      "state": "opaque",
+      "removable": false,
+      "screen": "rules"
+    },
+    {
+      "key": "permissions.defaultMode",
+      "group": "perms",
+      "groupTitle": "Permissions and safety",
+      "title": "Default mode",
+      "description": "Default permission mode.\n\"default\": prompts on first use.\nUNDOCUMENTED. \"manual\": accepted alias for \"default\" (the CLI/VS Code/JetBrains UI now labels this mode \"Manual\" as of v2.1.200; permission-modes.md has not yet been updated to mention it).\n\"acceptEdits\": auto-accepts file edits.\n\"plan\": read-only, no modifications.\nUNDOCUMENTED. \"delegate\": coordination-only for agent team leads (agent teams are experimental; enable via CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS).\n\"dontAsk\": auto-denies unless pre-approved via permissions.\n\"bypassPermissions\": skips all prompts (use only in isolated environ…",
+      "asks": null,
+      "applies": "new_sessions",
+      "control": "pick",
+      "state": "set",
+      "removable": true,
+      "of": [
+        {
+          "value": "plan",
+          "asks": null
+        },
+        {
+          "value": "default",
+          "asks": null
+        },
+        {
+          "value": "dontAsk",
+          "asks": null
+        },
+        {
+          "value": "acceptEdits",
+          "asks": null
+        },
+        {
+          "value": "auto",
+          "asks": null
+        }
+      ],
+      "value": "bypassPermissions"
+    },
+    {
+      "key": "env",
+      "group": "commands",
+      "groupTitle": "Commands that run",
+      "title": "Env",
+      "description": "Environment variables to set for Claude Code sessions. Many environment variables provide settings dimensions not available as dedicated settings.json properties (e.g., thinking tokens, prompt caching, bash timeouts, shell configuration).",
+      "asks": null,
+      "control": "link",
+      "state": "opaque",
+      "removable": false,
+      "screen": "env"
+    },
+    {
+      "key": "apiKeyHelper",
+      "group": "auth",
+      "groupTitle": "Sign-in and credentials",
+      "title": "Api key helper",
+      "description": "Path to a script that outputs authentication values.",
+      "asks": "runs",
+      "control": "text",
+      "state": "set",
+      "removable": true,
+      "rules": {
+        "minLength": 1
+      },
+      "value": "<hidden on the server>",
+      "hidden": 1
+    },
+    {
+      "key": "availableModels",
+      "group": "models",
+      "groupTitle": "Models",
+      "title": "Available models",
+      "description": "Restrict which models users can select. When defined at multiple settings levels (user, project, etc.), arrays are merged and deduplicated.",
+      "asks": null,
+      "control": "list",
+      "state": "set",
+      "removable": true,
+      "value": [
+        "opus"
+      ]
+    },
+    {
+      "key": "cleanupPeriodDays",
+      "group": "sessions",
+      "groupTitle": "Sessions and context",
+      "title": "Cleanup period days",
+      "description": "Number of days to retain sessions, orphaned subagent worktrees, tasks, shell snapshots, and backups. Minimum is 1; setting 0 is rejected with a validation error.",
+      "asks": null,
+      "control": "number",
+      "state": "set",
+      "removable": true,
+      "default": 30,
+      "rules": {
+        "integer": true,
+        "min": 1
+      },
+      "value": 30
+    },
+    {
+      "key": "attribution",
+      "group": "git",
+      "groupTitle": "Git and attribution",
+      "title": "Attribution",
+      "description": "Customize attribution for git commits and pull requests.",
+      "asks": null,
+      "control": "json",
+      "state": "set",
+      "removable": true,
+      "value": {
+        "commit": "a"
+      },
+      "text": "{\n  \"commit\": \"a\"\n}"
+    },
+    {
+      "key": "editorMode",
+      "group": "look",
+      "groupTitle": "Look and feel",
+      "title": "Editor mode",
+      "description": "Key binding mode for the input prompt: \"normal\" or \"vim\". Appears in /config as Editor mode.",
+      "asks": null,
+      "control": "pick",
+      "state": "unset",
+      "removable": false,
+      "default": "normal",
+      "of": [
+        {
+          "value": "normal",
+          "asks": null
+        },
+        {
+          "value": "vim",
+          "asks": null
+        }
+      ]
+    },
+    {
+      "key": "theme",
+      "group": "look",
+      "groupTitle": "Look and feel",
+      "title": "Theme",
+      "description": "Color theme for the interface: auto, dark, light, the daltonized variants (deuteranopia-friendly), the ansi variants (16-color terminals), or a custom theme reference such as custom:<slug> or custom:<plugin-name>:<slug>.",
+      "asks": null,
+      "control": "pick",
+      "state": "set",
+      "removable": true,
+      "default": "dark",
+      "of": [
+        {
+          "value": "auto",
+          "asks": null
+        },
+        {
+          "value": "dark",
+          "asks": null
+        },
+        {
+          "value": "light",
+          "asks": null
+        },
+        {
+          "value": "dark-daltonized",
+          "asks": null
+        },
+        {
+          "value": "light-daltonized",
+          "asks": null
+        },
+        {
+          "value": "dark-ansi",
+          "asks": null
+        },
+        {
+          "value": "light-ansi",
+          "asks": null
+        }
+      ],
+      "value": "dark"
+    },
+    {
+      "key": "verbose",
+      "group": "look",
+      "groupTitle": "Look and feel",
+      "title": "Verbose",
+      "description": "Show full tool output instead of truncated summaries. The --verbose flag overrides this for a single session. Requires Claude Code v2.1.119 or later.",
+      "asks": null,
+      "control": "switch",
+      "state": "set",
+      "removable": true,
+      "default": false,
+      "value": true
+    },
+    {
+      "key": "allowManagedHooksOnly",
+      "group": "managed",
+      "groupTitle": "For managed installs",
+      "title": "Allow managed hooks only",
+      "description": "(Managed settings only) Prevent loading of user, project, and plugin hooks. Only allows managed hooks and SDK hooks.",
+      "asks": "unknown",
+      "control": "readonly",
+      "state": "set",
+      "removable": false,
+      "value": true,
+      "readOnly": "managed",
+      "text": "true"
+    },
+    {
+      "key": "laterKey",
+      "group": "other",
+      "groupTitle": "Other",
+      "title": "Later key",
+      "description": "",
+      "asks": "unknown",
+      "control": "json",
+      "state": "set",
+      "removable": true,
+      "notInSchema": true,
+      "value": 1,
+      "text": "1"
+    }
+  ],
+  "hiddenKeys": 0
+}

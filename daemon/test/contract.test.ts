@@ -1441,6 +1441,22 @@ esac
         assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).env.SECRET, 'never-sent')
         contract('rest-raw-undone', { ...(await ok(post('/v1/agents/raw/undo', { agent: 'claude' }))), hash: 'file-hash' })
         writeFileSync(claudeFile, before)
+
+        // The form of every setting: docs/PROTOCOL.md, "The settings form".
+        writeFileSync(claudeFile, '{\n  "theme": "dark",\n  "verbose": true,\n  "cleanupPeriodDays": 30,\n  "availableModels": ["opus"],\n  "attribution": { "commit": "a" },\n  "apiKeyHelper": "/opt/never-sent",\n  "env": { "SECRET": "never-sent" },\n  "allowManagedHooksOnly": true,\n  "laterKey": 1,\n  "permissions": { "defaultMode": "bypassPermissions", "allow": ["never-sent"] }\n}\n')
+        const form = await ok(get('/v1/agents/settings/form?agent=claude'))
+        assert.ok(!JSON.stringify(form).includes('never-sent'))
+        const kept = new Set(['theme', 'verbose', 'cleanupPeriodDays', 'availableModels', 'attribution', 'apiKeyHelper', 'env', 'allowManagedHooksOnly', 'laterKey', 'permissions.defaultMode', 'permissions.allow', 'editorMode'])
+        contract('rest-settings-form', stable({ ...form, hash: 'file-hash', rows: form.rows.filter((r: { key: string }) => kept.has(r.key)) }))
+        const formPut = (o: object) => call('PUT', '/v1/agents/settings/form', { agent: 'claude', expected: form.hash, ...o })
+        contract('rest-settings-form-confirm', await refused(formPut({ key: 'hooks', value: {} }), 403))
+        contract('rest-settings-form-refused', await refused(formPut({ key: 'permissions.defaultMode', value: 'delegate', confirm: true }), 403))
+        contract('rest-settings-form-managed', await refused(formPut({ key: 'allowManagedHooksOnly', value: false, confirm: true }), 403))
+        contract('rest-settings-form-bad-value', await refused(formPut({ key: 'cleanupPeriodDays', value: 0 }), 400))
+        const formSaved = await ok(formPut({ key: 'verbose', value: false }))
+        contract('rest-settings-form-saved', stable({ ...formSaved, hash: 'file-hash' }))
+        contract('rest-settings-form-undone', stable({ ...(await ok(post('/v1/agents/settings/form/undo', { agent: 'claude', expected: formSaved.hash }))), hash: 'file-hash' }))
+        writeFileSync(claudeFile, before)
       }
       const usual = process.env.HYPERNOVA_CODEX
       process.env.HYPERNOVA_CODEX = fakeCodexBin(join(scratch, 'old-codex'), '0.39.0')

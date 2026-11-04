@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "agent": "claude",
+  "key": "verbose",
+  "changed": true,
+  "hash": "file-hash",
+  "undo": {
+    "key": "verbose",
+    "asks": false
+  }
+}

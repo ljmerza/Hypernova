@@ -237,6 +237,25 @@ export function restored(sent: string, stored: string): { text: string; doc: Rec
   return { text, doc: JSON.parse(text) }
 }
 
+/** [v] as it stands at [path] in a document of nothing else, so one value goes through the same masks as the whole file. */
+const wrapped = (path: readonly string[], v: unknown): Record<string, unknown> => {
+  let out: unknown = v
+  for (const p of [...path].reverse()) out = { [p]: out }
+  return out as Record<string, unknown>
+}
+
+/** One value as a client may see it, by the same rules as the whole file: [hidden] says how many places were kept back. */
+export function maskedAt(path: readonly string[], v: unknown): { value: unknown; hidden: number } {
+  const masked = maskedText(JSON.stringify(wrapped(path, v)))
+  return { value: at(JSON.parse(masked.text), path), hidden: masked.hidden }
+}
+
+/** What a client sent for one value, with each placeholder back as what's stored at that place. One anywhere else is refused, so a mask can't be written. */
+export function restoredAt(path: readonly string[], sent: unknown, stored: unknown): unknown {
+  const old = stored === undefined ? {} : wrapped(path, stored)
+  return at(restored(JSON.stringify(wrapped(path, sent)), JSON.stringify(old)).doc, path)
+}
+
 // ── What changed, and what each change takes ─────────────────────────────
 
 /**
