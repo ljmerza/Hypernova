@@ -244,12 +244,39 @@ class NewSessionTest {
 
     // ─── Modes ───
 
-    @Test fun bypassIsNotOfferedAndSaysWhere() = runDesktopComposeUiTest(1200, 900) {
+    @Test fun bypassAsksToThinkTwiceThenStartsThereOnceAndIsNotKept() = runDesktopComposeUiTest(1200, 900) {
         up()
         open()
-        inPane(Ui.mode_title_bypass.text()).assertDoesNotExist()
-        inPane(Ui.desk_bypass_on_phone.text()).assertIsDisplayed()
         for (m in listOf(Ui.mode_title_default, Ui.mode_title_accept, Ui.mode_title_plan, Ui.mode_title_auto)) inPane(m.text()).assertExists()
+        press(Ui.mode_title_bypass.text())
+        onNodeWithText(Ui.think_kicker_bypass.text().uppercase()).assertIsDisplayed()
+        onNodeWithText(Ui.think_keep.text()).assertIsFocused()
+        // Keep asking: it stays as it was.
+        onNodeWithText(Ui.think_keep.text()).performClick()
+        waitForIdle()
+        inPane(Ui.mode_title_default.text()).assertIsSelected()
+        press(Ui.mode_title_bypass.text())
+        onNodeWithText(Ui.think_use_bypass.text()).performClick()
+        waitForIdle()
+        inPane(Ui.mode_title_bypass.text()).assertIsSelected()
+        inPane(Ui.mode_bypass_desc.text()).assertIsDisplayed()
+        write("Go")
+        press(Ui.start.text())
+        until("it started") { d.count("POST", "/v1/sessions") == 1 }
+        assertEquals("bypassPermissions", sent().getString("permissionMode"))
+    }
+
+    @Test fun bypassIsNotKeptOnceTheFormIsPutAway() = runDesktopComposeUiTest(1200, 900) {
+        up()
+        open()
+        press(Ui.mode_title_bypass.text())
+        onNodeWithText(Ui.think_use_bypass.text()).performClick()
+        waitForIdle()
+        inPane(Ui.mode_title_bypass.text()).assertIsSelected()
+        press(Ui.cancel.text())
+        waitForIdle()
+        open()
+        inPane(Ui.mode_title_default.text()).assertIsSelected()
     }
 
     @Test fun aMemoryOfBypassNeverStartsThere() = runDesktopComposeUiTest(1200, 900) {
@@ -358,7 +385,7 @@ class NewSessionTest {
         inPane(Ui.cx_mode_read_only.text()).assertIsSelected()
         inPane(Ui.cx_mode_can_edit.text()).assertExists()
         inPane(Ui.mode_title_auto.text()).assertDoesNotExist()
-        inPane(Ui.desk_bypass_on_phone.text()).assertDoesNotExist()
+        inPane(Ui.mode_title_bypass.text()).assertDoesNotExist()
         press(Ui.cx_mode_can_edit.text())
         render("62-new-session-codex")
         write("Go")

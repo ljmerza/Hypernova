@@ -99,10 +99,9 @@ private const val NEW_PROJECT = "\u0000new"
 /**
  * New session in the right pane, the phone's sheet (ui/home/NewSessionSheet.kt) with what the desktop can honestly
  * offer: the prompt first, the folder, the agent, the mode. What the phone remembers and how it starts come from
- * `:shared`; the server decides what's allowed. **Bypass isn't offered:** on the phone it waits for the fingerprint or
- * the screen lock each time, and the server asks nothing more, so with no such check here it stays on the phone. Nor is
- * Codex's `danger-full-access` or approval `never`: only [AgentKind.CODEX_MODES]. Auto asks to think twice, as on the phone.
- * docs/DECISIONS.md, "The desktop client's New session".
+ * `:shared`; the server decides what's allowed. Bypass is chosen each time and is never remembered. Codex's
+ * `danger-full-access` and approval `never` aren't offered: only [AgentKind.CODEX_MODES]. Auto and Bypass ask to think
+ * twice, as on the phone. docs/DECISIONS.md, "The desktop client's New session" and "No fingerprints or screen locks".
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -250,24 +249,21 @@ internal fun NewSessionPane(hub: Hub, shell: Shell, server: String, onBack: (() 
                     Labelled(Ui.mode.text()) {
                         val now = if (onCodex) codexMode else mode
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for (m in if (onCodex) AgentKind.CODEX_MODES else NewSessionMemory.START_MODES) {
+                            for (m in if (onCodex) AgentKind.CODEX_MODES else NewSessionMemory.START_MODES + "bypassPermissions") {
                                 Choice(modeTitle(m), m == now) {
                                     when {
                                         onCodex -> codexModePick = m
                                         m == mode -> Unit
-                                        // Auto stops at the think-twice card, every time; with no list to show, it goes on.
+                                        // Auto and Bypass stop at the think-twice card, every time; with no list to show, Auto goes on and Bypass doesn't.
                                         m == "auto" -> DeskIncidents.next()?.let { thinking = DeskIncidents.Asked(m, it) } ?: run { modePick = m }
+                                        m == "bypassPermissions" -> DeskIncidents.next()?.let { thinking = DeskIncidents.Asked(m, it) }
                                         else -> modePick = m
                                     }
                                 }
                             }
                         }
                         Spacer(Modifier.height(6.dp))
-                        HText(modeLine(now), style = Type.small, color = if (now == "auto") HN.amber else HN.inkMuted)
-                        if (!onCodex) {
-                            Spacer(Modifier.height(4.dp))
-                            HText(Ui.desk_bypass_on_phone.text(), style = Type.small, color = HN.inkDim)
-                        }
+                        HText(modeLine(now), style = Type.small, color = if (now == "bypassPermissions") HN.danger else if (now == "auto") HN.amber else HN.inkMuted)
                     }
                     HText(Ui.desk_new_defaults.text(), style = Type.small, color = HN.inkDim)
                     // The subscription's trouble is Claude Code's: Codex goes by its own account.
@@ -355,13 +351,14 @@ private fun PromptBox(value: TextFieldValue, onChange: (TextFieldValue) -> Unit,
     )
 }
 
-/** Before Auto, one real case of an agent with too much freedom, every time. "Keep asking" has the focus and is where Enter goes. */
+/** Before Auto or Bypass, one real case of an agent with too much freedom, every time. "Keep asking" has the focus and is where Enter goes. */
 @Composable
 private fun ThinkTwice(asked: DeskIncidents.Asked, onKeep: () -> Unit, onGoOn: () -> Unit) {
     val focus = remember { FocusRequester() }
+    val bypass = asked.mode == "bypassPermissions"
     Modal(onKeep) {
         LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-        HText(Ui.think_kicker_auto.text().uppercase(), style = Type.label, color = HN.amber)
+        HText((if (bypass) Ui.think_kicker_bypass else Ui.think_kicker_auto).text().uppercase(), style = Type.label, color = if (bypass) HN.danger else HN.amber)
         Spacer(Modifier.height(8.dp))
         HText(asked.incident.headline, Modifier.semantics { heading() }, style = Type.title)
         Spacer(Modifier.height(8.dp))
@@ -370,7 +367,7 @@ private fun ThinkTwice(asked: DeskIncidents.Asked, onKeep: () -> Unit, onGoOn: (
         HText(Ui.think_ai_mistakes.text(), style = Type.small, color = HN.ink)
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-            Pill(Ui.think_use_auto.text(), onGoOn, kind = PillKind.Ghost)
+            Pill((if (bypass) Ui.think_use_bypass else Ui.think_use_auto).text(), onGoOn, kind = PillKind.Ghost)
             Pill(Ui.think_keep.text(), onKeep, Modifier.focusRequester(focus), kind = PillKind.Primary)
         }
     }

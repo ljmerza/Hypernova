@@ -35,7 +35,9 @@
     <string name="desk_pane_phone_only">The terminal isn\'t in this app yet. Open this session on your phone for it.</string>
     <string name="desk_pane_in_history">This session is in History. You can read it here, and writing in it resumes it.</string>
     <string name="desk_pane_runs_phone">This is the newest run of %1$s. Its other runs are on your phone, under Automations.</string>
-    <string name="desk_bypass_on_phone">Bypass waits for a fingerprint or a screen lock, which this computer can\'t check. Choose it on your phone.</string>
+    <string name="desk_always_session">%1$s, for this session</string>
+    <string name="desk_always_project">%1$s, in this project</string>
+    <string name="desk_always_everywhere">%1$s, everywhere</string>
     <string name="desk_new_defaults">It starts on the default model and effort. To choose others, start it on your phone.</string>
     <string name="desk_more_asks">%1$d more waiting after this one.</string>
     <string name="desk_zoom">Zoom %1$d%%</string>

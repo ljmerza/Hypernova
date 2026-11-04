@@ -60,6 +60,8 @@ import com.prudnikweb.hypernova.data.inHistory
 import com.prudnikweb.hypernova.desktop.CardOffer
 import com.prudnikweb.hypernova.desktop.Shell
 import com.prudnikweb.hypernova.desktop.Ui
+import com.prudnikweb.hypernova.desktop.alwaysWords
+import com.prudnikweb.hypernova.desktop.answerAlways
 import com.prudnikweb.hypernova.desktop.answerCard
 import com.prudnikweb.hypernova.desktop.doingLine
 import com.prudnikweb.hypernova.desktop.factsOf
@@ -276,12 +278,14 @@ private fun NotWholeCommand(offer: CardOffer.NotWhole) {
 private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell) {
     var going by remember(offer.id) { mutableStateOf<Boolean?>(null) }
     var failed by remember(offer.id) { mutableStateOf(false) }
-    fun send(allow: Boolean) {
+    var askingAlways by remember(offer.id) { mutableStateOf(false) }
+    val always = (offer as? CardOffer.Whole)?.takeIf { it.always != null }
+    fun send(allow: Boolean, answer: suspend () -> Boolean = { answerCard(hub, sessionId, offer, allow, shell::say) }) {
         if (going != null) return
         going = allow
         failed = false
         Core.scope.launch {
-            val ok = runCatching { answerCard(hub, sessionId, offer, allow, shell::say) }.getOrDefault(false)
+            val ok = runCatching { answer() }.getOrDefault(false)
             // Answered: the card goes with the hub's next word on it, and these stay until then.
             if (!ok) {
                 going = null
@@ -310,7 +314,19 @@ private fun AskPills(hub: Hub, sessionId: String, offer: CardOffer, shell: Shell
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             Pill(Ui.deny.text(), { send(false) }, kind = PillKind.Danger)
+            if (always != null) Pill(Ui.always.text(), { askingAlways = true }, kind = PillKind.Outline)
             if (offer is CardOffer.Whole) Pill(Ui.allow.text(), { send(true) }, kind = PillKind.Primary)
         }
+    }
+    if (askingAlways && always != null) {
+        ConfirmModal(
+            Ui.always_confirm_title.text(), alwaysWords(always, always.always!!), Ui.always_save.text(),
+            onConfirm = {
+                askingAlways = false
+                send(true) { answerAlways(hub, always) }
+            },
+            onDismiss = { askingAlways = false },
+            danger = true,
+        )
     }
 }

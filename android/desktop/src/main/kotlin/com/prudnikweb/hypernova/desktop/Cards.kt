@@ -4,6 +4,8 @@ import com.prudnikweb.hypernova.data.Account
 import com.prudnikweb.hypernova.data.AccountWords
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.AllowRule
+import com.prudnikweb.hypernova.data.AlwaysDraft
+import com.prudnikweb.hypernova.data.AlwaysScope
 import com.prudnikweb.hypernova.data.Answer
 import com.prudnikweb.hypernova.data.Blocked
 import com.prudnikweb.hypernova.data.DeleteKind
@@ -186,6 +188,7 @@ fun modeLine(mode: String): String = when (mode) {
     "acceptEdits" -> Ui.mode_accept_desc
     "plan" -> Ui.mode_plan_desc
     "auto" -> Ui.mode_auto_desc
+    "bypassPermissions" -> Ui.mode_bypass_desc
     AgentKind.READ_ONLY -> Ui.cx_mode_read_only_desc
     AgentKind.CAN_EDIT -> Ui.cx_mode_can_edit_desc
     else -> Ui.mode_default_desc
@@ -290,8 +293,8 @@ fun agoWords(ms: Long): String {
 sealed interface CardOffer {
     val id: String
 
-    /** The whole command, unmasked and uncut ([text]): Deny and Allow. */
-    data class Whole(override val id: String, val tool: String, val text: String, val terminal: TerminalAsk? = null) : CardOffer
+    /** The whole command, unmasked and uncut ([text]): Deny and Allow, and Always where the ask [always] offers it. */
+    data class Whole(override val id: String, val tool: String, val text: String, val terminal: TerminalAsk? = null, val always: AlwaysOffer? = null) : CardOffer
 
     /** A tool whose command can't be read whole here: masked and on one line ([detail]), Deny only. */
     data class NotWhole(override val id: String, val tool: String, val detail: String, val terminal: TerminalAsk? = null) : CardOffer
@@ -307,7 +310,7 @@ sealed interface CardOffer {
         }
 
         fun of(a: WApproval): CardOffer = when (a.kind) {
-            "tool" -> AllowRule.answerable(a)?.let { Whole(a.id, a.toolName, it) }
+            "tool" -> AllowRule.answerable(a)?.let { Whole(a.id, a.toolName, it, always = AlwaysOffer.of(a)) }
                 ?: NotWhole(a.id, a.toolName, masked(AllowRule.detail(a).first))
             else -> InChat(a.id, plan = a.kind == "plan")
         }
@@ -322,6 +325,32 @@ sealed interface CardOffer {
 
         private fun masked(text: String): String = AllowRule.oneLine(Secrets.shown(text.trim(), command = true)).take(AllowRule.DETAIL_MAX)
     }
+}
+
+/** What Always would leave: Claude Code's own rules, where it suggests them ([rules] empty: its own "don't ask again"). */
+data class AlwaysOffer(val rules: List<String>, val scope: AlwaysScope) {
+    companion object {
+        fun of(a: WApproval): AlwaysOffer? = a.takeIf { it.canAlways }?.let { AlwaysDraft.of(it.alwaysRules, it.alwaysScope) }?.let { AlwaysOffer(it.rules, it.scope) }
+    }
+}
+
+/** Always's confirm: the rule and where it goes, or what Always means with no rule, then the whole command. */
+fun alwaysWords(offer: CardOffer.Whole, always: AlwaysOffer): String {
+    val saying = if (always.rules.isEmpty()) Ui.always_means.text() else {
+        val rules = always.rules.joinToString(", ")
+        when (always.scope) {
+            AlwaysScope.Session -> Ui.desk_always_session.format(rules) + "\n\n" + Ui.always_scope_session_body.text()
+            AlwaysScope.Project -> Ui.desk_always_project.format(rules) + "\n\n" + Ui.always_scope_project_body.text()
+            AlwaysScope.Everywhere -> Ui.desk_always_everywhere.format(rules) + "\n\n" + Ui.always_scope_everywhere_body.text()
+        }
+    }
+    return saying + "\n\n" + offer.text
+}
+
+/** Sends a card's Always, after its confirm. True once the server has it. */
+suspend fun answerAlways(hub: Hub, offer: CardOffer.Whole): Boolean {
+    val always = offer.always ?: return false
+    return hub.answerApproval(offer.id, if (always.rules.isEmpty()) Answer.Always else Answer.AlwaysAs(always.scope, always.rules))
 }
 
 /** Sends a card's Allow or Deny: an approval's through the approval route, a terminal dialog's as its Yes or No. True once the server has it. */

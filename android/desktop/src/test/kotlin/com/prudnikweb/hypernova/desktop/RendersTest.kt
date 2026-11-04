@@ -1,8 +1,12 @@
 package com.prudnikweb.hypernova.desktop
 
+import androidx.compose.ui.graphics.toAwtImage
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.isRoot
+import androidx.compose.ui.test.onLast
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -66,6 +70,7 @@ class RendersTest {
     private fun approvals() = listOf(
         approval("a1", "5e550009", summary = "Bash: npm run db:migrate -- --env staging") {
             put("input", JSONObject().put("command", "npm run db:migrate -- --env staging"))
+            put("canAlways", true).put("alwaysRules", org.json.JSONArray(listOf("Bash(npm run db:migrate *)"))).put("alwaysScope", "project")
         },
         approval("a2", "5e550011", summary = "Edit: src/import/errors.ts") {
             put("toolName", "Edit").put("input", JSONObject().put("file_path", "src/import/errors.ts").put("old_string", "a").put("new_string", "b"))
@@ -190,7 +195,10 @@ class RendersTest {
         pairedWith(d)
         waitForIdle()
         choose("Add idempotency keys to the payments webhook")
+        // Deny, then Always, then Allow, as the row reads. Enter on Always only opens its confirm.
         onRoot().performKeyInput { repeat(7) { pressKey(Key.Tab) } }
+        onNodeWithText(Ui.always.text()).assertIsFocused()
+        onRoot().performKeyInput { pressKey(Key.Tab) }
         onNodeWithText(Ui.allow.text()).assertIsFocused()
         ok(render("10-focus"))
     }
@@ -211,6 +219,15 @@ class RendersTest {
     @Test fun twoPanesNothingChosen() = runDesktopComposeUiTest(960, 720) { panesWith(null, "30-panes-none") }
 
     @Test fun twoPanesAWholeCommand() = runDesktopComposeUiTest(960, 720) { panesWith("Add idempotency keys to the payments webhook", "31-panes-allow") }
+
+    @Test fun alwaysItsConfirm() = runDesktopComposeUiTest(960, 720) {
+        panesWith("Add idempotency keys to the payments webhook", "38-panes-always")
+        onNodeWithText(Ui.always.text()).performClick()
+        waitForIdle()
+        // The card's its own root, over the window: as NewSessionTest's pictureOfTheCard.
+        val dir = java.io.File(System.getProperty("hypernova.renders") ?: "build/renders").apply { mkdirs() }
+        javax.imageio.ImageIO.write(onAllNodes(isRoot()).onLast().captureToImage().toAwtImage(), "png", java.io.File(dir, "39-always-confirm.png"))
+    }
 
     @Test fun twoPanesWhatCantBeReadWhole() = runDesktopComposeUiTest(960, 720) { panesWith("Rewrite the importer's error handling", "32-panes-not-whole") }
 
