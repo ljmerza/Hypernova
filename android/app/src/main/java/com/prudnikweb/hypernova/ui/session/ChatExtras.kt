@@ -179,7 +179,7 @@ private fun rewindAsk(session: Session, items: List<Item>, item: Item): RewindAs
         running = when {
             gone -> RewindRunning.No
             session.state == com.prudnikweb.hypernova.data.SessionState.NeedsYou -> RewindRunning.Waiting
-            session.state == com.prudnikweb.hypernova.data.SessionState.Working || session.agentsRunning > 0 || session.queued > 0 -> RewindRunning.Working
+            session.state == com.prudnikweb.hypernova.data.SessionState.Working || session.goesOn || session.queued > 0 -> RewindRunning.Working
             else -> RewindRunning.No
         },
         terminalCloses = !gone && (session.term != null || session.agentJob != null),

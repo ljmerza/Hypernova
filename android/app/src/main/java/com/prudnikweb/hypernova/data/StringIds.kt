@@ -456,5 +456,6 @@ val Plural.id: Int
         Plural.run_calls_done -> R.plurals.run_calls_done
         Plural.run_calls_now -> R.plurals.run_calls_now
         Plural.servers_elsewhere -> R.plurals.servers_elsewhere
+        Plural.status_waiting_monitors -> R.plurals.status_waiting_monitors
         Plural.turns -> R.plurals.turns
     }

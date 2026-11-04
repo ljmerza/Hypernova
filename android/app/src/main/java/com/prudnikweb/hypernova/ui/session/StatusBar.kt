@@ -143,7 +143,7 @@ internal fun rememberStatusBar(hub: Hub, session: Session, items: List<Item>, se
     // the Mac only watches can't be stopped from here (the Mac answers 409).
     val stoppable = session.term != null || session.origin == "hypernova"
     val raw = statusBar(
-        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow, agents = agents),
+        BarInput(session.phase, session.state, session.activity, sending, session.agentsRunning, pending, todos, reads, stoppable = stoppable, workflow = workflow, agents = agents, monitorsRunning = session.monitorsRunning),
     )
     val isError = raw?.tone == BarTone.Error
     // Kept out here so the list stays open (or folded) across short gaps between two steps.
@@ -189,6 +189,8 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
     var since by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val alive = model != null
     LaunchedEffect(alive) { if (alive) since = System.currentTimeMillis() }
+    // No turn and no agents while only a Monitor runs: how long that has, as the board knows it.
+    val monitorSince = hub.agents(session.id).shells.values.filter { it.running && it.monitor }.minOfOrNull { it.startedAt }
     // Stop pressed: "Stopping…" and no second Esc (a second one opens Claude Code's rewind menu
     // in a shared terminal) until the turn ends, or 3 seconds pass.
     var stopping by remember(session.id) { mutableStateOf(false) }
@@ -209,7 +211,7 @@ internal fun ChatStatusBar(hub: Hub, session: Session, bar: StatusBarState, modi
         if (shown != null) {
             Column {
                 val opener = com.prudnikweb.hypernova.ui.LocalOpener.current
-                StatusCard(shown, session, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
+                StatusCard(shown, session, bar.todos, bar.workflow, bar.agents, bar.open, bar.onToggle, monitorSince ?: since, bar.away, stopping, codex = session.codex, onOpenAgent = { id -> opener.agent(session.id, id) }, modifier = Modifier.weight(1f, fill = false)) {
                     if (!stopping) {
                         stopping = true
                         hub.interrupt(session.id)
@@ -468,6 +470,7 @@ private fun sayText(s: Say): String = when (s.kind) {
     SayKind.Workflow -> stringResource(R.string.status_workflow, s.arg)
     SayKind.MainAndAgents -> pluralStringResource(R.plurals.status_main_agents, s.n, s.n)
     SayKind.MainWaiting -> stringResource(R.string.status_main_waiting)
+    SayKind.WaitingMonitors -> pluralStringResource(R.plurals.status_waiting_monitors, s.n, s.n)
     SayKind.Raw -> s.arg
     SayKind.WaitApprove -> stringResource(R.string.status_wait_approve, s.arg)
     SayKind.WaitAnswer -> stringResource(R.string.status_wait_answer)

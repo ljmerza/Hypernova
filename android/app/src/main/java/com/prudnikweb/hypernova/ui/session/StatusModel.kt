@@ -33,6 +33,7 @@ internal enum class SayKind {
     MainAndAgents,
     /** The main agent idle, or in a foreground Agent call, while its agents work. */
     MainWaiting,
+    WaitingMonitors,
     /** An agent's activity this build can't put in words, as the Mac said it. */
     Raw,
     WaitApprove, WaitAnswer, WaitPlan, WaitYou, Failed,
@@ -60,6 +61,8 @@ internal data class BarInput(
     val stoppable: Boolean = true,
     /** The agents at work outside a running workflow, from the board ([barAgents]). */
     val agents: List<BarAgent> = emptyList(),
+    /** Monitors holding it in Working while its main agent rests (Session.busy). */
+    val monitorsRunning: Int = 0,
 )
 
 internal data class BarModel(
@@ -156,6 +159,8 @@ internal fun statusBar(i: BarInput): BarModel? {
         // The main agent is done for now but agents it started carry on: still a turn, as the user sees it.
         // A workflow keeps it too between its phases, when none of its agents is at work.
         n > 0 || wf != null -> working(Say(SayKind.MainWaiting), false)
+        // Nothing runs but its Monitor: it waits, as the agents' line says, and there's nothing to stop.
+        i.monitorsRunning > 0 -> model(BarTone.Working, Say(SayKind.WaitingMonitors, n = i.monitorsRunning), false)
         else -> null
     }
 }

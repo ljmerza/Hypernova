@@ -1056,6 +1056,12 @@ fun SessionCard(
                         Spacer(Modifier.width(6.dp))
                         com.prudnikweb.hypernova.ui.automations.OutlineChip(stringResource(R.string.cx_agent_codex), HN.inkMuted)
                     }
+                    // Plain background commands going on: words, not a chip, and nothing at none. An ask's pills keep their room.
+                    if (ask == null && s.plainShells > 0) {
+                        val said = pluralStringResource(R.plurals.session_sheet_shells_said, s.plainShells, s.plainShells)
+                        Spacer(Modifier.width(8.dp))
+                        HText(pluralStringResource(R.plurals.top_bar_shells, s.plainShells, s.plainShells), Modifier.clearAndSetSemantics { contentDescription = said }, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                    }
                 }
                 if (ask != null) {
                     Spacer(Modifier.width(8.dp))

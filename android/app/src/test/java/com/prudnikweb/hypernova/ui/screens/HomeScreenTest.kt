@@ -3,6 +3,7 @@
 package com.prudnikweb.hypernova.ui.screens
 
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performTextInput
@@ -134,6 +136,53 @@ class HomeScreenTest {
         rule.onNodeWithText("3/7", substring = true).assertExists()
         rule.onNodeWithContentDescription(str(R.string.working_for_said, context.resources.getQuantityString(R.plurals.working_minutes, 12, 12)), useUnmergedTree = true).assertExists()
         rule.snap("home_working_card")
+    }
+
+    /** The mark as TalkBack has it: its text sits under this, so a look for the words alone would find none and prove nothing. */
+    private fun shellsSaid(n: Int) = context.resources.getQuantityString(R.plurals.session_sheet_shells_said, n, n)
+    private fun marks(n: Int) = rule.onAllNodesWithContentDescription(shellsSaid(n), useUnmergedTree = true)
+    private fun seamOf(group: Int) = str(R.string.group_said, str(group), context.resources.getQuantityString(R.plurals.sessions_count, 1, 1))
+
+    @Test fun aPlainShellStaysInCompletedWithAQuietMark() {
+        home(FakeHub(sessions = only(Samples.MID).map { it.copy(shellsRunning = 2) }))
+        rule.onNodeWithContentDescription(seamOf(R.string.group_done), useUnmergedTree = true).assertExists()
+        marks(2).assertCountEquals(1)
+        rule.onNodeWithText("Wrote the summary").assertExists()
+    }
+
+    @Test fun nothingShowsAtNoShellsOrAfterItsSessionEnded() {
+        home(FakeHub(sessions = only(Samples.MID) + only(Samples.ALPHA).map { it.copy(phase = com.prudnikweb.hypernova.data.Phase.Ended, shellsRunning = 1) }))
+        marks(1).assertCountEquals(0)
+    }
+
+    @Test fun aMonitorIsWorkingAndNotInTheMark() {
+        home(FakeHub(sessions = only(Samples.MID).map { it.copy(shellsRunning = 1, monitorsRunning = 1, activity = "Waiting for its Monitor") }))
+        rule.onNodeWithContentDescription(seamOf(R.string.group_working), useUnmergedTree = true).assertExists()
+        rule.onNodeWithText("Waiting for its Monitor").assertExists()
+        marks(1).assertCountEquals(0)
+    }
+
+    @Test fun bothWorkingWithOnlyTheShellMarked() {
+        home(FakeHub(sessions = only(Samples.MID).map { it.copy(shellsRunning = 2, monitorsRunning = 1) }))
+        rule.onNodeWithContentDescription(seamOf(R.string.group_working), useUnmergedTree = true).assertExists()
+        marks(1).assertCountEquals(1)
+        marks(2).assertCountEquals(0)
+    }
+
+    @Config(qualifiers = "w320dp-h640dp")
+    @Test fun theMarkFitsANarrowPhoneWithoutMakingTheCardTaller() {
+        fun chip() = rule.onNodeWithText(str(R.string.state_idle).uppercase(), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val hub = FakeHub(sessions = only(Samples.MID))
+        home(hub)
+        val before = chip()
+        hub.sessionList = only(Samples.MID).map { it.copy(shellsRunning = 2) }
+        rule.waitForIdle()
+        val mark = marks(2).onFirst().fetchSemanticsNode().boundsInRoot
+        val width = rule.onRoot().fetchSemanticsNode().boundsInRoot.right
+        assertTrue("it isn't cut off: ${mark.right} of $width", mark.width > 0f && mark.right < width)
+        assertTrue("on the chips' line: $mark, $before", mark.top >= before.top && mark.bottom <= before.bottom)
+        assertEquals("the card is no taller", before.bottom, chip().bottom, 0.5f)
+        rule.snap("home_card_shell_mark_narrow")
     }
 
     @Test fun tappingACardOpensItsSession() {

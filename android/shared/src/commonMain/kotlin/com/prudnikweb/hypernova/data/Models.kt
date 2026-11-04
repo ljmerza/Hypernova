@@ -57,8 +57,10 @@ data class Session(
     val createdAt: Long = 0L,
     /** Agents its main agent started that are running now. */
     val agentsRunning: Int = 0,
-    /** Background commands it has running now (docs/PROTOCOL.md, "Background commands"). */
+    /** Background commands it has running now, its Monitors among them (docs/PROTOCOL.md, "Background commands"). */
     val shellsRunning: Int = 0,
+    /** How many of those are Monitors holding it in Working: none from an older server. */
+    val monitorsRunning: Int = 0,
     /** Stopped by a limit, a sign-out or its provider, until a real reply clears it. */
     val blocked: Blocked? = null,
     /** It can switch to Bypass: false for a terminal session on the Mac that wasn't started with bypass allowed. */
@@ -119,10 +121,16 @@ data class Session(
     /**
      * Working, by the one rule every surface uses (docs/PROTOCOL.md, Session.state; owner,
      * 2026-10-18): a live session is working while Claude works on it (or is starting) or any agent
-     * it started still runs; needing you outranks it. Home's counts, chips and order, the
+     * it started or a Monitor still runs; needing you outranks it. Home's counts, chips and order, the
      * background notification, the widgets and the chat's status bar all ask this.
      */
-    val busy: Boolean get() = phase != Phase.Ended && state != SessionState.NeedsYou && (state == SessionState.Working || agentsRunning > 0)
+    val busy: Boolean get() = phase != Phase.Ended && state != SessionState.NeedsYou && (state == SessionState.Working || goesOn)
+
+    /** Its main agent may rest while what it started goes on and will come back to it: agents, or a Monitor. Not a plain shell. */
+    val goesOn: Boolean get() = agentsRunning > 0 || monitorsRunning > 0
+
+    /** The background commands a list's quiet mark counts: those that aren't Monitors, none once it has ended. */
+    val plainShells: Int get() = if (phase == Phase.Ended) 0 else (shellsRunning - monitorsRunning).coerceAtLeast(0)
 
     /**
      * Its card's line says "Stopped with an error" in the danger colour, in place of its last words:

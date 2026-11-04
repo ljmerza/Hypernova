@@ -829,7 +829,7 @@ class LiveHub(
             notice(Notice("$kind:$id:${s.lastActivityAt}", kind, id, name, text))
         }
         when (new.state) {
-            "idle" -> if (old.state == "working") later(Notice.Kind.Finished) { it.state == "idle" && it.agentsRunning == 0 && it.blocked == null }
+            "idle" -> if (old.state == "working") later(Notice.Kind.Finished) { it.state == "idle" && it.agentsRunning == 0 && it.monitorsRunning == 0 && it.blocked == null }
             "needs_you" -> later(Notice.Kind.Waiting) { s -> s.state == "needs_you" && approvals.values.none { it.sessionId == id } }
             "error" -> if (new.blocked == null) notice(Notice("error:$id:${new.lastActivityAt}", Notice.Kind.Error, id, session(id)?.name ?: new.title, new.lastText ?: res.getString(Str.activity_error)))
         }
@@ -1034,6 +1034,8 @@ class LiveHub(
             phase == Phase.Working -> w.activity ?: res.getString(Str.activity_working)
             phase == Phase.Error -> w.lastText ?: res.getString(Str.activity_error)
             phase == Phase.Ended -> w.lastText ?: res.getString(Str.activity_ended)
+            // At rest but Working, on nothing but its Monitor: said so, in place of its last words.
+            phase == Phase.Idle && w.monitorsRunning > 0 && w.agentsRunning == 0 -> res.getQuantityString(Plural.status_waiting_monitors, w.monitorsRunning, w.monitorsRunning)
             else -> w.lastText ?: res.getString(Str.activity_waiting)
         }
         val provider = providers.firstOrNull { it.id == w.providerId }
@@ -1072,6 +1074,7 @@ class LiveHub(
             createdAt = w.createdAt,
             agentsRunning = w.agentsRunning,
             shellsRunning = w.shellsRunning,
+            monitorsRunning = w.monitorsRunning,
             blocked = w.blocked,
             endedBy = w.endedBy,
             automation = w.automation,

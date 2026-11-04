@@ -103,6 +103,9 @@ fun rowLine(offer: CardOffer?, s: Session): RowLine = when {
 
 fun inChatWords(offer: CardOffer.InChat): String = if (offer.plan) Ui.desk_ask_plan.text() else Ui.desk_ask_question.text()
 
+/** A row's quiet mark for plain background commands going on ("2 shells"): null at none, so nothing shows. */
+fun shellMark(s: Session): String? = s.plainShells.takeIf { it > 0 }?.let { DesktopStrings.quantityNamed("top_bar_shells", it).format(it) }
+
 /** A row has a chip only for what its group's seam doesn't already say: paused, starting, an error, ended. */
 fun rowHasChip(s: Session, block: Blocked?): Boolean = block != null || s.phase == Phase.Starting || s.phase == Phase.Error || s.phase == Phase.Ended
 

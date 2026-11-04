@@ -206,7 +206,7 @@ internal fun ChatTimeLabel(hub: Hub, sessionId: String, opening: Int, list: Lazy
         told[0] = opening
         val s = hub.session(sessionId) ?: return@LaunchedEffect
         // At work isn't quiet, even with no message for hours.
-        if (held || hub.sending(sessionId) || s.state == SessionState.Working || s.agentsRunning > 0) return@LaunchedEffect
+        if (held || hub.sending(sessionId) || s.state == SessionState.Working || s.goesOn) return@LaunchedEffect
         val last = hub.chatTimes(sessionId).lastMessage ?: return@LaunchedEffect
         if (System.currentTimeMillis() - last < QUIET_AFTER_MS) return@LaunchedEffect
         quiet = last

@@ -71,6 +71,8 @@ data class WSession(
     val agentsRunning: Int = 0,
     /** Background commands it has running now, as Claude Code's status line counts them; an older Mac doesn't say. */
     val shellsRunning: Int = 0,
+    /** How many of those are Monitors holding it in Working; an older Mac doesn't say. */
+    val monitorsRunning: Int = 0,
     /** Stopped by an account or provider problem (a limit, signed out…), until a real reply clears it. */
     val blocked: Blocked? = null,
     /** Can switch to Bypass (an older Mac doesn't say: then yes, and the switch reports if not). */
@@ -696,6 +698,7 @@ object Wire {
             queue = o.arr("queue").mapObjects(::queued),
             agentsRunning = o.int("agentsRunning") ?: 0,
             shellsRunning = o.int("shellsRunning") ?: 0,
+            monitorsRunning = o.int("monitorsRunning") ?: 0,
             blocked = runCatching { blocked(o.obj("blocked")) }.getOrNull(),
             endedBy = o.str("endedBy")?.takeIf { it.isNotBlank() },
             automation = AutomationWire.sessionAutomation(o.obj("automation")),

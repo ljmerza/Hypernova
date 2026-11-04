@@ -110,6 +110,7 @@ import com.prudnikweb.hypernova.desktop.neighbour
 import com.prudnikweb.hypernova.desktop.orderOf
 import com.prudnikweb.hypernova.desktop.rowHasChip
 import com.prudnikweb.hypernova.desktop.rowLine
+import com.prudnikweb.hypernova.desktop.shellMark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.ZoneId
@@ -506,7 +507,16 @@ private fun SessionRow(hub: Hub, s: Session, chosen: Boolean, marked: Boolean, o
             Seam(
                 s.project, activity = if (needs) Activity.Alert else if (s.busy) Activity.Live else Activity.Rest,
                 color = if (needs) HN.amber else HN.inkMuted,
-                trailContent = { HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1) },
+                trailContent = {
+                    // On the line that's always there, so a row is no taller with it.
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        shellMark(s)?.let {
+                            HText(it, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        HText(s.hex, style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
+                    }
+                },
             )
             Spacer(Modifier.height(6.dp))
             HText(s.name, style = Type.heading, maxLines = 2)

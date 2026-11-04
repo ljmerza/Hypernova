@@ -121,6 +121,14 @@ class ContractTest {
             val s = Wire.session(ws(o, "session").obj("session")!!)
             assertEquals("sess-shells", s.id)
             assertEquals(1, s.shellsRunning)
+            assertEquals("no Monitor on the wire reads as none", 0, s.monitorsRunning)
+        },
+        "ws-session-monitors" to { o ->
+            val s = Wire.session(ws(o, "session").obj("session")!!)
+            assertEquals("sess-shells", s.id)
+            assertEquals("idle", s.state)
+            assertEquals(3, s.shellsRunning)
+            assertEquals(1, s.monitorsRunning)
         },
         "ws-projects" to { o ->
             val p = ws(o, "projects").arr("projects").mapObjects(Wire::project)
