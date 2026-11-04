@@ -10,17 +10,22 @@ import { randomUUID } from 'node:crypto'
 import { SUPPORT, log, readJson, writeJson } from './util.ts'
 import { splitAttachments, withAttachments, type Attachment } from './attachments.ts'
 
-/** One held prompt: the prompt as Claude Code gets it (attachments as @-mentions first), and the phone send it came from. */
-type Entry = { id: string; prompt: string; at: number; clientId: string | null }
+/**
+ * One held prompt: the prompt as Claude Code gets it (attachments as @-mentions first), and the phone
+ * send it came from. [editing]: the owner has it open to change: it's never sent, nor anything behind it,
+ * until they save or cancel, however long that takes and whatever Claude does meanwhile.
+ */
+type Entry = { id: string; prompt: string; at: number; clientId: string | null; editing?: boolean }
 /** As `session.held` shows it: the text without its @-mentions, the files apart, as `session.queue` does. */
-export type HeldView = { id: string; text: string; files?: Attachment[]; at: number; clientId: string | null }
+export type HeldView = { id: string; text: string; files?: Attachment[]; at: number; clientId: string | null; editing?: true }
 
 /** Whether a session's input box could be back: `ready` to try, `wait` for now, `ended` (or gone): nothing will take it. */
 export type HeldReady = 'ready' | 'wait' | 'ended'
 /** Prompts that left the line without reaching Claude, as a notice's `unsent` names them. */
 export type HeldUnsent = { reason: 'returned' | 'dropped'; text: string; prompts: { text: string; clientId: string | null }[] }
 export type HeldOps = {
-  ready: (sessionId: string) => HeldReady
+  /** Whether [prompt], next in line, can go: a command waits for the turn to end, and a message for a command ahead of it. */
+  ready: (sessionId: string, prompt?: string) => HeldReady
   /** Type it in, as the prompt route does; throws the route's error (with its `code`) when it can't. */
   send: (sessionId: string, prompt: string, clientId: string | null) => Promise<void>
   /** The session's held prompts changed: its clients hear of it. */
@@ -54,7 +59,7 @@ function load(): Record<string, Entry[]> {
   if (!o || typeof o !== 'object' || Array.isArray(o)) return out
   for (const [sid, list] of Object.entries(o)) {
     if (!Array.isArray(list)) continue
-    const ok = list.filter((e): e is Entry => !!e && typeof e.id === 'string' && typeof e.prompt === 'string').map((e) => ({ id: e.id, prompt: e.prompt, at: Number(e.at) || Date.now(), clientId: typeof e.clientId === 'string' ? e.clientId : null }))
+    const ok = list.filter((e): e is Entry => !!e && typeof e.id === 'string' && typeof e.prompt === 'string').map((e) => ({ id: e.id, prompt: e.prompt, at: Number(e.at) || Date.now(), clientId: typeof e.clientId === 'string' ? e.clientId : null, ...(e.editing === true ? { editing: true } : {}) }))
     if (ok.length) out[sid] = ok
   }
   return out
@@ -78,7 +83,7 @@ export function heldView(sessionId: string): { held?: HeldView[] } {
   return {
     held: list.map((e) => {
       const { text, files } = splitAttachments(e.prompt)
-      return { id: e.id, text, ...(files.length ? { files } : {}), at: e.at, clientId: e.clientId }
+      return { id: e.id, text, ...(files.length ? { files } : {}), at: e.at, clientId: e.clientId, ...(e.editing ? { editing: true as const } : {}) }
     }),
   }
 }
@@ -99,14 +104,63 @@ export function hold(sessionId: string, prompt: string, clientId: string | null)
   return e
 }
 
-/** New words for a held prompt, its files kept. `gone`: no such prompt (sent, or removed); `sending`: being typed now. */
+/**
+ * Prompts taken out of a queue ahead of anything held (they were sent first): [editing] on the one the
+ * owner opened. In the order given.
+ */
+export function holdFirst(sessionId: string, list: { prompt: string; at: number; clientId: string | null; editing?: boolean }[]): Entry[] {
+  const made: Entry[] = list.map((e) => ({ id: randomUUID(), prompt: e.prompt, at: e.at, clientId: e.clientId, ...(e.editing ? { editing: true } : {}) }))
+  if (!made.length) return made
+  held[sessionId] = [...made, ...(held[sessionId] ?? [])]
+  save()
+  ops?.changed(sessionId)
+  tickSoon()
+  return made
+}
+
+/** The line goes on under the session its conversation moved to (/clear): ahead of anything held there. */
+export function moveHeld(from: string, to: string): void {
+  const list = held[from]
+  if (!list?.length || from === to) return
+  delete held[from]
+  endedSince.delete(from)
+  failedAt.delete(from)
+  held[to] = [...list, ...(held[to] ?? [])]
+  save()
+  ops?.changed(from)
+  ops?.changed(to)
+  kickHeld(to)
+}
+
+/** The session holding held prompt [heldId], the one asked about or the one it moved on to. */
+export const holdsIt = (sessionId: string, heldId: string): boolean => !!held[sessionId]?.some((x) => x.id === heldId)
+
+/** New words for a held prompt, its files kept, and no longer being edited. `gone`: no such prompt (sent, or removed); `sending`: being typed now. */
 export function editHeld(sessionId: string, heldId: string, text: string): 'ok' | 'gone' | 'sending' {
   const e = held[sessionId]?.find((x) => x.id === heldId)
   if (!e) return 'gone'
   if (sending.get(sessionId) === heldId) return 'sending'
   e.prompt = withAttachments(text, splitAttachments(e.prompt).files.map((f) => f.path))
+  delete e.editing
   save()
   ops?.changed(sessionId)
+  kickHeld(sessionId)
+  return 'ok'
+}
+
+/**
+ * The owner opened a held prompt to change it, or stopped without changing it. Being typed right
+ * now, it can't be held back: `sending`. [drain] is what obeys this, so it holds whatever the screen does.
+ */
+export function setHeldEditing(sessionId: string, heldId: string, on: boolean): 'ok' | 'gone' | 'sending' {
+  const e = held[sessionId]?.find((x) => x.id === heldId)
+  if (!e) return 'gone'
+  if (sending.get(sessionId) === heldId) return on ? 'sending' : 'gone'
+  if (on) e.editing = true
+  else delete e.editing
+  save()
+  ops?.changed(sessionId)
+  if (!on) kickHeld(sessionId)
   return 'ok'
 }
 
@@ -196,7 +250,8 @@ export async function drain(sessionId: string, now = Date.now): Promise<void> {
   if (!ops || sending.has(sessionId) || now() - (failedAt.get(sessionId) ?? 0) < HELD_RETRY_MS) return
   for (;;) {
     const e = held[sessionId]?.[0]
-    if (!e || ops.ready(sessionId) !== 'ready') return
+    // Being edited: it stays, and so does everything behind it. Nothing else lets it go.
+    if (!e || e.editing || ops.ready(sessionId, e.prompt) !== 'ready') return
     sending.set(sessionId, e.id)
     let code: string | null = null
     try {

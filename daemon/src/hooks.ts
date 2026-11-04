@@ -56,6 +56,7 @@ import {
 import { applyToolResult, isLauncher, toolSummary } from './normalize.ts'
 import { agentLabel, endSessionAgents, hookActivity, hookLaunched, hookStop, hookSubagentStop, hookToolDone } from './agents.ts'
 import { attachmentReadInput, readsAttachment } from './attachments.ts'
+import { noteCleared } from './cleared.ts'
 import { noteDenied } from './denied.ts'
 import { noteBlocked } from './blocked.ts'
 import { noteHookEvent } from './hookevents.ts'
@@ -102,6 +103,7 @@ export async function handleHook(ev: any, req: IncomingMessage, res: ServerRespo
       // notification will say so). After /clear or a switch to another session the same process
       // goes on, and they may too: those settle once their files go quiet.
       if (ev.reason !== 'clear' && ev.reason !== 'resume') endSessionAgents(sid)
+      if (ev.reason === 'clear') noteCleared(sid)
       noteHookEvent('SessionEnd', sid, null, `The session ended${typeof ev.reason === 'string' && ev.reason ? ` (${ev.reason})` : ''}.`)
       return {}
     case 'UserPromptSubmit':

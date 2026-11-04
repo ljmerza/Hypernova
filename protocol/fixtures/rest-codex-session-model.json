@@ -33,6 +33,7 @@
     "browsable": true,
     "outsideProjects": false,
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   },
   "applies": "now"

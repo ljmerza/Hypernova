@@ -86,11 +86,13 @@ internal fun MessageMenu(
     onDismiss: () -> Unit,
     /** The session it's in: what the Mac's speaking wave and this phone's status line show it on. */
     sessionId: String? = null,
+    /** A waiting message opened to change ([WaitingEditSheet]). */
+    onWaitingEdit: (com.prudnikweb.hypernova.data.WaitingEdit) -> Unit = {},
 ) {
     val context = LocalContext.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
-    if (item is Item.User && (item.waiting || item.held)) return WaitingMenu(hub, item, onDismiss, sessionId)
+    if (item is Item.User && item.changeable) return WaitingMenu(hub, item, onDismiss, sessionId, onWaitingEdit)
     val text = item.menuText() ?: return onDismiss()
     val mine = item is Item.User
     var page by remember(item.key) { mutableStateOf(Page.Actions) }

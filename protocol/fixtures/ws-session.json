@@ -38,6 +38,7 @@
       "reason": "exit 1 — Error: the API refused the request"
     },
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   }
 }

@@ -39,6 +39,7 @@
     "agentJob": "f00d0001",
     "agentRunning": false,
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   }
 }

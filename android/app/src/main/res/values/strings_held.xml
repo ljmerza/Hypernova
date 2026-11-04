@@ -2,7 +2,10 @@
 <resources>
     <!-- Fork: held prompts (data/Held.kt). A prompt sent while Claude waits for your answer: the Mac holds it and types it in after. -->
     <string name="held_label">Held</string>
-    <string name="held_hint">Sends after you answer</string>
+    <string name="held_hint">Sends as soon as Claude can take it</string>
+    <string name="waiting_editing_label">Being edited</string>
+    <string name="waiting_editing_hint">Won\'t send until you save or cancel</string>
+    <string name="waiting_too_late">That message had already gone, so it wasn\'t changed.</string>
     <string name="held_err_edit">Couldn\'t change the held message.</string>
     <string name="held_err_remove">Couldn\'t remove the held message.</string>
     <!-- Home's session card: how many prompts the Mac holds for it. -->

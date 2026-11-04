@@ -29,6 +29,7 @@ object Held {
         files = h.files,
         command = if (h.files.isEmpty()) CommandRun.typed(h.text) else null,
         heldId = h.id,
+        editing = h.editing,
     )
 
     /**

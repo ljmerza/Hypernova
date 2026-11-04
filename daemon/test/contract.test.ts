@@ -1014,6 +1014,10 @@ test('POST /v1/client-logs: where it was kept, and the refusal past the rate lim
 test('PUT and DELETE …/held/{id}: a held prompt’s new words, then taken back', async () => {
   const s = (await ok(get('/v1/snapshot'))).sessions.find((x: { id: string }) => x.id === 'sess-held')
   const [first, second] = s.held
+  // Opened to change it: nothing sends it until the owner has finished. Saving ends that.
+  const opened = await ok(call('PUT', `/v1/sessions/sess-held/held/${second.id}`, { editing: true }))
+  assert.equal(opened.session.held[1].editing, true)
+  contract('rest-held-editing', opened)
   contract('rest-held-edit', await ok(call('PUT', `/v1/sessions/sess-held/held/${second.id}`, { text: 'Then commit it, with a message' })))
   contract('rest-held-remove', await ok(call('DELETE', `/v1/sessions/sess-held/held/${first.id}`)))
   assert.equal((await refused(call('DELETE', `/v1/sessions/sess-held/held/${first.id}`), 404)).error.code, 'no_held')
@@ -1720,6 +1724,22 @@ test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a 
     const twice = await post(`/v1/sessions/${cx}/switch`, { to: 'claude', text: preview.text })
     assert.equal(twice.status, 409)
     contract('rest-switch-switched', twice.json)
+
+    // One entry of a queue: removed, then taken out to edit (Claude Code's own, with the real binary: queue-edit-e2e.test.ts).
+    fake.autoTurn = false
+    const line = (await ok(post('/v1/sessions', { agent: 'codex', projectPath: cwd, prompt: '[Hypernova test] the turn', clientId: 'client-cx-2' }))).session.id
+    for (let i = 0; i < 150 && !fake.running.has(line); i++) await new Promise((r) => setTimeout(r, 20))
+    for (const [text, clientId] of [['Run the tests too', 'client-cx-3'], ['And the linter', 'client-cx-4']]) await ok(post(`/v1/sessions/${line}/prompt`, { text, clientId }))
+    const waiting = hub.listSessions().find((s) => s.id === line)!.queue
+    assert.equal(waiting.length, 2)
+    assert.equal(hub.listSessions().find((s) => s.id === line)!.queueEdit, true)
+    contract('rest-queue-remove', await ok(call('DELETE', `/v1/sessions/${line}/queue/${waiting[1]!.id}`)))
+    const edit = await ok(post(`/v1/sessions/${line}/queue/${waiting[0]!.id}/edit`, {}))
+    contract('rest-queue-edit', edit)
+    contract('rest-queue-gone', asServer(await refused(call('DELETE', `/v1/sessions/${line}/queue/${waiting[0]!.id}`), 404)))
+    assert.equal((await ok(call('DELETE', `/v1/sessions/${line}/held/${edit.heldId}`))).session.held, undefined)
+    fake.autoTurn = true
+    fake.end(line, 'completed')
   } finally {
     await post('/v1/codex', { enabled: false })
     delete process.env.HYPERNOVA_CODEX_SOCKET

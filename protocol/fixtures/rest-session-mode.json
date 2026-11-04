@@ -24,7 +24,8 @@
     "term": {
       "id": "term-id",
       "mac": 0,
-      "phone": 0
+      "phone": 0,
+      "unqueue": true
     },
     "menu": null,
     "agentsRunning": 0,
@@ -38,6 +39,7 @@
     "agentJob": "mode0001",
     "agentRunning": true,
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   }
 }

@@ -56,6 +56,35 @@ export function isImmediateCommand(text: string): boolean {
   return !!m && IMMEDIATE.has(m[1]!)
 }
 
+// Run at once too, over the spinner, though the table above doesn't say so (measured on 2.1.318: no
+// queue entry, a panel or nothing in the way). Everything else that starts with "/", a skill's name
+// too, waits in Claude Code's queue while Claude works.
+const RUNS_NOW = new Set([...IMMEDIATE, 'model', 'effort', 'cost', 'stats', 'config', 'settings', 'help', 'fast', 'name'])
+
+/**
+ * Whether [text] is a command Claude Code would queue while Claude works. A message typed behind one
+ * overtakes it (measured on 2.1.318: Claude Code hands messages over when a step ends and leaves commands
+ * for the turn's end, so "/clear" then a message runs the message first and then wipes it), so the
+ * daemon keeps these in its own line (held.ts). A path ("/Users/…") isn't a command.
+ */
+export function waitsInQueue(text: string): boolean {
+  const m = /^\/([^\s/]+)(?:\s|$)/.exec(text.trimStart())
+  return !!m && !RUNS_NOW.has(m[1]!)
+}
+
+// Claude Code's own commands with no use for words after them: it drops them, and the owner's message
+// with them (measured on 2.1.318: `<command-args>` and no turn). /clear's list entry does offer "[name]",
+// the next session's title, but a client's box can't tell that from a message, and a lost message costs
+// more than a title (docs/DECISIONS.md, "A message after a command"). /compact's words are its
+// instructions, and every other command's its own: those stay.
+const TAKES_NO_WORDS = new Set(['clear', 'reset', 'new', 'context', 'usage', 'cost', 'stats', 'reload-skills'])
+
+/** "/clear read this" as the command and the message after it; null for anything else. */
+export function splitCommand(text: string): { command: string; words: string } | null {
+  const m = /^\/([a-z][\w-]*)\s+(\S[\s\S]*)$/.exec(text.trim())
+  return m && TAKES_NO_WORDS.has(m[1]!) ? { command: `/${m[1]}`, words: m[2]! } : null
+}
+
 // Claude Code's own commands that only make sense in a terminal on the Mac, or not at all from a phone.
 const HIDDEN = new Set(['heapdump', 'workflow-launch-exec', 'color', 'focus', 'statusline', 'terminal-setup', 'vim', 'ide', 'exit', 'quit'])
 // Claude Code's own commands that open a screen of their own in the terminal, one the phone can't

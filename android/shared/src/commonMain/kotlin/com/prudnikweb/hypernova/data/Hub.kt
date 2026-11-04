@@ -140,6 +140,24 @@ interface Hub {
     fun heldCount(sessionId: String): Int = 0
     /** Takes a held prompt back: it's never sent. */
     suspend fun removeHeld(sessionId: String, heldId: String): Result<Unit> = Result.failure(UnsupportedOperationException())
+    /**
+     * A waiting message ([Item.User.changeable]) opened to change: from here nothing sends it, on this
+     * phone or the Mac, whatever Claude does, until [saveWaitingEdit] or [cancelWaitingEdit]. Too late
+     * ([WaitingTooLate]): it has gone, and the chat says so.
+     */
+    suspend fun openWaitingEdit(sessionId: String, item: Item.User): Result<WaitingEdit> = Result.success(WaitingEdit(sessionId, item.text, waitingId = item.waitingId, heldId = item.heldId, emptyOk = item.waiting && item.files.isNotEmpty()))
+    suspend fun saveWaitingEdit(edit: WaitingEdit, text: String): Result<Unit> = when {
+        edit.waitingId != null -> if (editWaiting(edit.waitingId, text)) Result.success(Unit) else Result.failure(HubException(""))
+        edit.heldId != null -> editHeld(edit.sessionId, edit.heldId, text.trim())
+        else -> Result.failure(UnsupportedOperationException())
+    }
+    fun cancelWaitingEdit(edit: WaitingEdit) {}
+    /** A waiting message gone, wherever it waits. Too late ([WaitingTooLate]): it has gone to Claude, and the chat says so. */
+    suspend fun removeWaitingMessage(sessionId: String, item: Item.User): Result<Unit> = when {
+        item.waitingId != null -> Result.success(removeWaiting(item.waitingId))
+        item.heldId != null -> removeHeld(sessionId, item.heldId)
+        else -> Result.failure(UnsupportedOperationException())
+    }
 
     /** Puts a picked file on the Mac, to attach to a prompt. */
     suspend fun upload(file: Upload): Result<Attachment>
@@ -404,6 +422,15 @@ interface Hub {
 
 /** A failure the UI can show as-is (the message is already human). */
 open class HubException(message: String) : Exception(message)
+
+/**
+ * A waiting message open to change: [text], its words whole, and where it waits (the phone's [waitingId] or
+ * the Mac's [heldId]). [emptyOk]: it has files, and may go with no words (the Mac wants words with a held one's).
+ */
+data class WaitingEdit(val sessionId: String, val text: String, val waitingId: String? = null, val heldId: String? = null, val emptyOk: Boolean = false)
+
+/** The owner's choice about a waiting message came after it left. The chat says so: nothing more needs saying. */
+class WaitingTooLate(message: String) : HubException(message)
 
 /** A prompt didn't go: the session's terminal has unsent text ([pending]) in its input box. */
 class TerminalBusy(message: String, val pending: String) : HubException(message)

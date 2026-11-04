@@ -175,7 +175,7 @@ fun UserMessage(
     codex: Boolean = false,
 ) {
     val cmd = remember(item.command, known) { item.command?.refined(known) }
-    val status = when (item.status) {
+    val status = if (item.editing) stringResource(Str.waiting_editing_label) else when (item.status) {
         SendStatus.Sending -> stringResource(Str.sending)
         SendStatus.QueuedStep, SendStatus.QueuedReply -> stringResource(Str.queued_label)
         SendStatus.WaitingMac -> stringResource(Str.waiting_mac_label)
@@ -186,7 +186,7 @@ fun UserMessage(
     // Claude Code hands a queued prompt to Claude when the step it's on finishes; an SDK session
     // runs one prompt at a time, so there it waits for the whole reply, and so does a Codex
     // session's (its terminal too: the Mac queues it behind the turn).
-    val hint = when (item.status) {
+    val hint = if (item.editing) stringResource(Str.waiting_editing_hint) else when (item.status) {
         SendStatus.QueuedStep -> stringResource(if (codex) Str.queued_hint_reply else Str.queued_hint_step)
         SendStatus.QueuedReply -> stringResource(Str.queued_hint_reply)
         SendStatus.WaitingMac -> stringResource(Str.waiting_mac_hint)

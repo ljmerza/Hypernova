@@ -482,13 +482,20 @@ val Str.id: Int
         Str.untitled_session -> R.string.untitled_session
         Str.update_body -> R.string.update_body
         Str.update_title -> R.string.update_title
+        Str.cancel -> R.string.cancel
+        Str.waiting_editing_hint -> R.string.waiting_editing_hint
+        Str.waiting_editing_label -> R.string.waiting_editing_label
+        Str.waiting_edit -> R.string.waiting_edit
         Str.waiting_files_gone -> R.string.waiting_files_gone
         Str.waiting_gone_hint -> R.string.waiting_gone_hint
         Str.waiting_gone_label -> R.string.waiting_gone_label
         Str.waiting_mac_hint -> R.string.waiting_mac_hint
         Str.waiting_mac_label -> R.string.waiting_mac_label
         Str.waiting_no_folder -> R.string.waiting_no_folder
+        Str.waiting_remove -> R.string.waiting_remove
+        Str.waiting_save -> R.string.waiting_save
         Str.waiting_start_new -> R.string.waiting_start_new
+        Str.waiting_too_late -> R.string.waiting_too_late
         Str.wf_ask_notif_default -> R.string.wf_ask_notif_default
         Str.wf_err_answers -> R.string.wf_err_answers
         Str.wf_err_bad_answer -> R.string.wf_err_bad_answer
