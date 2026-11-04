@@ -438,9 +438,27 @@ enum class Str {
     workflow_label,
     workflow_running_of,
     you,
+    // The settings form: the rows the app already words, and its own.
+    as_k_effort, as_k_effort_body, as_k_mode, as_k_mode_body, as_k_thinking, as_k_thinking_body, as_k_dream, as_k_dream_body, as_k_coauthor, as_k_coauthor_body,
+    as_k_channel, as_k_channel_body, as_k_input, as_k_input_body, as_k_agent_push, as_k_agent_push_body, as_k_model, as_k_model_body, as_k_reasoning, as_k_reasoning_body,
+    as_k_approval, as_k_approval_body, as_k_sandbox, as_k_sandbox_body, as_k_web, as_k_web_body, as_k_personality, as_k_personality_body,
+    as_v_none, as_v_minimal, as_v_low, as_v_medium, as_v_high, as_v_xhigh, as_v_max, as_v_ultra, as_v_dont_ask, as_v_latest, as_v_stable, as_v_rc, as_v_untrusted, as_v_on_failure,
+    as_v_on_request, as_v_never, as_v_read_only, as_v_workspace_write, as_v_full_access, as_v_disabled, as_v_cached, as_v_indexed, as_v_live, as_v_friendly, as_v_pragmatic,
+    mode_title_default, mode_title_accept, mode_title_plan, mode_title_auto, mode_title_bypass,
+    as_when_new_sessions, as_when_maybe_new_session, as_when_next_update, as_when_new_threads, as_when_new_threads_unchosen,
+    as_l_plan, as_l_default, as_l_dont_ask, as_l_accept, as_l_auto, as_l_latest, as_l_stable, as_l_on_request, as_l_read_only, as_l_workspace_write,
+    as_saved, as_saving, as_undo_row, as_undone, as_why_link, as_why_read_only, as_why_no_folder, as_mcp, as_plugins, as_effort, env_title,
+    raw_fold, raw_unfold, raw_bad_at, raw_no_fold, raw_save, raw_check_title, raw_undo_body,
+    try_again, loading,
+    sf_title_claude, sf_title_codex, sf_row, sf_row_body, sf_search, sf_source, sf_scope_claude, sf_scope_codex, sf_when_unknown, sf_not_set, sf_not_set_default, sf_on, sf_off, sf_set_mark, sf_set_hidden, sf_in_file,
+    sf_hidden, sf_hidden_json, sf_hidden_keys, sf_remove, sf_add, sf_item_hint, sf_item_remove, sf_change_action, sf_open, sf_own_screen_rules, sf_ro_managed, sf_ro_not_offered, sf_ro_shape, sf_ro_too_big,
+    sf_not_read, sf_not_in_schema, sf_asks_runs, sf_asks_loosens, sf_asks_reach, sf_asks_unknown, sf_p_needed, sf_p_short, sf_p_long, sf_p_form, sf_p_nan, sf_p_whole, sf_p_below, sf_p_above, sf_p_not_over,
+    sf_p_many, sf_p_few, sf_p_twice, sf_none, sf_err, sf_state_malformed, sf_state_unreadable,
 }
 
 enum class Plural {
+    raw_keys,
+    raw_items,
     agent_tool_calls,
     agents_count,
     ask_show_all,

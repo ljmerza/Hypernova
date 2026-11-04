@@ -6032,6 +6032,63 @@ Claude Code's three `settings*.json` files, named by scope (user, project, local
 
 The Android app: `ui/settings/RawScreens.kt`, `Route.AgentRaw`, from the List and JSON switch on Claude Code's settings screen. Folding is the app's alone (`data/JsonFold.kt`): what's saved is always the whole text.
 
+### The settings form
+
+(`daemon/src/agent-settings-form.ts`, `agent-settings-classes.ts`; docs/DECISIONS.md, "Every setting, from the agents' own schemas"; the risk: docs/SECURITY-MODEL.md, 25.) Every one of an agent's user-level settings as rows, generated from the schema shipped in `daemon/src/schemas/`. A new setting needs no client code. Fixtures: `rest-settings-form*`. All three want a paired device. **An older daemon answers 404** to each, and the screen says it's older.
+
+**`GET /v1/agents/settings/form?agent=claude|codex`**
+
+```
+FormReply = {
+  agent, scope: "user",
+  source: { from, licence, fetched, checkedAgainst },
+  placeholder: "<hidden on the server>",
+  state: "ok" | "missing" | "malformed" | "unreadable",    // malformed: no rows, and nothing of the file
+  hash: string | null,                                     // send it back as `expected`
+  whyNot: "link" | "read_only" | "no_folder" | "unreadable" | null,   // link, unreadable: no rows. Otherwise rows are shown and nothing can change
+  undo: { key, asks: boolean } | null,                     // only for the form's own last change
+  hiddenKeys: number,                                      // keys of the file whose names don't go out
+  rows: FormRow[],                                         // in the groups' order
+}
+FormRow = {
+  key, group, groupTitle, title, description,              // `permissions.defaultMode` for a part of permissions
+  control: "switch" | "pick" | "text" | "number" | "list" | "json" | "link" | "readonly",
+  state: "set" | "unset" | "opaque",                       // opaque: there, in a shape that doesn't leave
+  value?,                                                  // masked; a secret's place holds `placeholder`
+  text?,                                                   // json and readonly rows: value laid out, or where an editor starts
+  hidden?: number,                                         // places kept back in value
+  default?,                                                // the schema's, when it has one; only ever shown as unset
+  of?: { value, label?, asks }[],                          // all a pick offers. Bypass and the like are never here
+  rules?: { min, max, above, integer, minLength, maxLength, pattern, minItems, maxItems, unique, itemMinLength },
+  asks: "runs" | "loosens" | "reach" | "unknown" | null,   // null for a pick whose `of` says each way
+  readOnly?: "managed" | "not_offered" | "shape" | "too_big",
+  removable: boolean,
+  screen?: "rules" | "mcp" | "plugins" | "env" | "effort", // control is link, and nothing of the value is sent
+  notRead?: true,                                          // the checked agent's own check doesn't know this key here
+  notInSchema?: true,                                      // in the file, not in the schema: control json for Claude Code, and it asks
+  applies?: "new_sessions" | "maybe_new_session" | "next_update" | "new_threads" | "new_threads_unchosen",   // absent: not known
+}
+```
+
+Enterprise-only keys are left out unless the file has them, then `readonly`. Codex's tables and lists are `readonly`, `opaque`, with no value: the TOML reader can't see inside to mask.
+
+**`PUT /v1/agents/settings/form`** `{ agent, key, value | valueJson, expected, confirm? }`. `value: null` takes the key out. `valueJson` is a JSON editor's text, so its keys stay in the order typed. Answer: `{ ok, agent, key, changed, hash, undo }`, and `agent_settings` is broadcast when it changed.
+
+| Refused | Status | When |
+|---|---|---|
+| `confirm_needed` | 403 | It runs code, loosens or changes what's reached, and `confirm` isn't `true`. Its message: the key, a blank line, what it does. Never the value |
+| `value_not_allowed` | 403 | Not what this offers, or `classify()` calls it refused, nested too. The confirm doesn't help |
+| `managed_only`, `own_screen`, `read_only_here`, `key_not_editable` | 403 | Those rows, or a key in neither the schema nor the file |
+| `bad_value`, `bad_json`, `placeholder_unknown` | 400 | Not what the schema takes; not JSON, with its line and column; a mask where nothing's hidden |
+| `file_changed`, `file_is_link`, `file_read_only`, `file_malformed`, `unsupported_shape`, `no_folder` | 409 | As "Agent settings", "Changing one" |
+| `models_unavailable` | 409 | Codex's `model` with no list from Codex |
+
+A value left as its `placeholder` is `changed: false`, and nothing is written.
+
+**`POST /v1/agents/settings/form/undo`** `{ agent, expected, confirm? }`. The form's last change, the file back byte for byte, if it's still what that wrote. Judged as a change: `confirm_needed` if putting it back would be; `undo_refused` (409) if it would restore a permissive value, with the backup staying on the server; `nothing_to_undo` for a change the list made. The list's own Undo refuses a form change of a key it has no rule for.
+
+Clients: `data/SettingsForm.kt` (the wire and the logic), `ui/settings/SettingsForm*.kt` in `sharedui` (the rows), `ui/settings/SettingsFormScreen.kt` on the phone (`Route.AgentForm`), `ui/AgentFormPane.kt` on the desktop.
+
 ### Updating an agent
 
 Agents & providers › an agent's Settings › Version, one server at a time. Why it's this way, and what was measured: docs/DECISIONS.md, "Updating Claude Code and Codex". The code: `daemon/src/agent-update.ts`.

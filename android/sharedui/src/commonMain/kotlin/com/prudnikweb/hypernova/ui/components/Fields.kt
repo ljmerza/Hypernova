@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -189,6 +190,21 @@ fun Field(
             }
         },
     )
+}
+
+/** A switch in the house style: a glass track that washes mint, a mint knob. */
+@Composable
+fun SwitchMark(checked: Boolean, modifier: Modifier = Modifier) {
+    val x by androidx.compose.animation.core.animateDpAsState(if (checked) 18.dp else 0.dp, tween(Motion.DIALOG, easing = Motion.Expo), label = "knob")
+    Box(
+        modifier
+            .size(width = 42.dp, height = 24.dp)
+            .clip(CircleShape)
+            .glassChoice(checked)
+            .padding(3.dp),
+    ) {
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }.size(18.dp).clip(CircleShape).background(if (checked) HN.accent else HN.inkMuted))
+    }
 }
 
 /** Radio circle: 18dp ring, 10dp fill. */

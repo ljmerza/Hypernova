@@ -151,20 +151,9 @@ fun FieldLabel(text: String, modifier: Modifier = Modifier, trail: String? = nul
     }
 }
 
-/** A switch in the house style: a glass track that washes mint, a mint knob. */
+/** The kit's switch ([SwitchMark]), by the name the phone's screens use. */
 @Composable
-fun Toggle(checked: Boolean, modifier: Modifier = Modifier) {
-        val x by animateDpAsState(if (checked) 18.dp else 0.dp, tween(Motion.DIALOG, easing = Motion.Expo), label = "knob")
-    Box(
-        modifier
-            .size(width = 42.dp, height = 24.dp)
-            .clip(CircleShape)
-            .glassChoice(checked)
-            .padding(3.dp),
-    ) {
-        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }.size(18.dp).clip(CircleShape).background(if (checked) HN.accent else HN.inkMuted))
-    }
-}
+fun Toggle(checked: Boolean, modifier: Modifier = Modifier) = SwitchMark(checked, modifier)
 
 /** A settings row with a title, a description and a switch. The whole row toggles (48dp+). */
 @Composable

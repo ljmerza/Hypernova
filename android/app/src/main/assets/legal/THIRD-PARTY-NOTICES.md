@@ -42,6 +42,7 @@ Read from the Maven POMs of its runtime classpath, 2026-11-02. Each package hold
 | @xterm/headless, @xterm/addon-serialize and @xterm/addon-unicode-graphemes (with its bundled tiny-inflate and unicode-trie) | MIT |
 | @anthropic-ai/claude-agent-sdk (the JavaScript client the daemon uses to run Claude Code; **not bundled**: the Mac app's Setup fetches it from npm onto your Mac, the Linux install with `npm ci`) | Anthropic's terms: "© Anthropic PBC. All rights reserved. Use is subject to Anthropic's Legal Agreements" |
 | zod and the other packages of the daemon's `node_modules` | MIT, ISC or Apache-2.0: see each package's own LICENSE file, which stays in the bundle |
+| The agents' settings schemas, copied unchanged into `daemon/src/schemas/`: SchemaStore's `claude-code-settings.json` (https://github.com/SchemaStore/schemastore) and OpenAI Codex's `codex-rs/core/config.schema.json` at tag `rust-v0.164.0` (https://github.com/openai/codex; "OpenAI Codex, Copyright 2025 OpenAI") | Apache-2.0, each repository's own licence |
 | Node.js (downloaded at first use from nodejs.org, not bundled) | MIT and others: https://github.com/nodejs/node/blob/main/LICENSE |
 | Manrope and JetBrains Mono | SIL Open Font License 1.1 (`Fonts/OFL-*.txt`) |
 

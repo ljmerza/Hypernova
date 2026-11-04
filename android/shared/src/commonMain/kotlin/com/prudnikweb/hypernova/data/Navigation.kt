@@ -43,6 +43,7 @@ sealed interface Route {
     data class AgentEnv(val agent: String) : Route { override val key = "agent-env:$agent" }
     /** One of Claude Code's settings files as raw JSON, folding as it goes. */
     data class AgentRaw(val agent: String) : Route { override val key = "agent-raw:$agent" }
+    data class AgentForm(val agent: String) : Route { override val key = "agent-form:$agent" }
     /** Settings › Logs › Connection log (data/ConnLog.kt). */
     data object ConnectionLog : Route { override val key = "connection-log" }
     /** Settings › a server: everything of that one server, with one server on screen or with "All servers". */
@@ -124,7 +125,7 @@ fun sessionStack(stack: List<Route>, id: String, fresh: Boolean = false): List<R
  */
 val Route.isSettingsPage: Boolean get() = when (this) {
     Route.Providers, is Route.ProviderEdit, is Route.AgentSettings, is Route.McpServers, is Route.McpServerPage, is Route.McpEdit,
-    is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw,
+    is Route.Plugins, is Route.PluginPage, is Route.PluginBrowse, is Route.Skills, is Route.AgentEnv, is Route.AgentRaw, is Route.AgentForm,
     Route.ConnectionLog, is Route.ServerSettings, Route.NotificationSettings, Route.TopBarSettings, Route.CardSwipeSettings,
     Route.TypingVoiceSettings, Route.LogSettings -> true
     Route.Home, is Route.Session, is Route.Files, is Route.FileView, is Route.Web, is Route.Terminal, is Route.Agent, is Route.AutomationEdit -> false

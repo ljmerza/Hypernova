@@ -432,6 +432,7 @@ val Route.debugWords: String
         is Route.Skills -> "skills"
         is Route.AgentEnv -> "agent environment"
         is Route.AgentRaw -> "agent raw settings"
+        is Route.AgentForm -> "agent settings form"
         Route.ConnectionLog -> "connection log"
         is Route.ServerSettings -> "a server's settings"
         Route.NotificationSettings -> "notification settings"

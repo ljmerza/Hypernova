@@ -15,11 +15,13 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.runDesktopComposeUiTest
@@ -76,6 +78,7 @@ class PanesTest {
     }
 
     @After fun tearDown() {
+        shell.settings = false
         DesktopRig.reset()
         d.close()
         others.forEach { it.close() }
@@ -91,6 +94,40 @@ class PanesTest {
     private fun ComposeUiTest.key(k: Key) {
         onRoot().performKeyInput { pressKey(k) }
         waitForIdle()
+    }
+
+    // ─── The settings form ───
+
+    /** The phone's rows over real mutual TLS, in this window's frame. What runs code asks one tap here too: there's no fingerprint on either. */
+    @Test fun settingsOpensTheFormAndItAsksOneTapBeforeRunningCode() = runDesktopComposeUiTest(1200, 800) {
+        val rows = """[
+            {"key":"hooks","group":"commands","groupTitle":"Commands that run","title":"Hooks","description":"Lifecycle hooks.","control":"json","state":"set","value":{"Stop":[]},"text":"{\n  \"Stop\": []\n}","asks":"runs","removable":true},
+            {"key":"verbose","group":"look","groupTitle":"Look and feel","title":"Verbose","description":"Full output.","control":"switch","state":"unset","default":false,"asks":null,"removable":false}]"""
+        val form = JSONObject("""{"agent":"claude","scope":"user","source":{"from":"SchemaStore","checkedAgainst":"Claude Code 2.1.318"},"placeholder":"<hidden on the server>","state":"ok","hash":"h1","whyNot":null,"undo":null,"hiddenKeys":0,"rows":$rows}""")
+        val sent = java.util.concurrent.CopyOnWriteArrayList<JSONObject>()
+        d.ok("GET", "/v1/agents/settings/form", form)
+        d.on("PUT", "/v1/agents/settings/form") { req ->
+            val body = JSONObject(req.body)
+            sent += body
+            if (body.getString("key") == "hooks" && !body.optBoolean("confirm")) {
+                FakeDaemon.json(403, JSONObject().put("error", JSONObject().put("code", "confirm_needed").put("message", "hooks\n\nThis can run a command on the server.")))
+            } else FakeDaemon.json(200, JSONObject().put("ok", true).put("changed", true).put("hash", "h2"))
+        }
+        up()
+        shell.settings = true
+        waitForIdle()
+        onNodeWithText(com.prudnikweb.hypernova.desktop.DesktopStrings.text(com.prudnikweb.hypernova.data.Str.sf_title_claude)).performScrollTo().performClick()
+        until("the rows") { onAllNodesWithText("verbose").fetchSemanticsNodes().isNotEmpty() }
+        onNodeWithText("Hooks").performClick()
+        waitForIdle()
+        onNodeWithText(com.prudnikweb.hypernova.desktop.DesktopStrings.text(com.prudnikweb.hypernova.data.Str.sf_remove)).performClick()
+        until("the first ask") { sent.size == 1 }
+        until("the confirm") { onAllNodesWithText("hooks\n\nThis can run a command on the server.").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals("nothing's claimed before the tap", false, sent[0].optBoolean("confirm"))
+        onNodeWithText(com.prudnikweb.hypernova.desktop.DesktopStrings.text(com.prudnikweb.hypernova.data.Str.sf_change_action)).performClick()
+        until("the second ask") { sent.size == 2 }
+        assertEquals(true, sent[1].getBoolean("confirm"))
+        assertTrue(sent[1].isNull("value"))
     }
 
     // ─── Choosing ───

@@ -241,7 +241,8 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Agents boards, an agent's own screen | Not yet | Only a count in the pane |
 | Settings: debug logging | There | The desktop's only part of the phone's Settings |
 | Settings: where the key and tokens are, alerts | Desktop only | |
-| Settings: providers, account and sign-in, agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
+| Settings: every one of an agent's settings, the form (`ui.settings` in `sharedui`, `AgentFormPane.kt`) | There | Same rows and same one-tap confirm as the phone, what runs code included: there's no fingerprint to wait for (DECISIONS, "Every setting, from the agents' own schemas"). A row with a screen of its own only says which, until those screens come |
+| Settings: providers, account and sign-in, the short list of agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
 | Settings: notifications per group, Read aloud, top bar, typing, display, the server's switches (auto-update, debug, Browse outside projects, Stay awake), checklist, connection log | Not yet | |
 
 **What only a phone is for**
