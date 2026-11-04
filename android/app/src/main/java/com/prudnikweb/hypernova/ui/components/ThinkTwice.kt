@@ -97,7 +97,7 @@ fun ThinkTwiceCard(mode: String, incident: Incident, onKeep: () -> Unit, onGoOn:
  * Bypass: tapping either opens the card first and the mode changes only on "Use … anyway". A mode
  * the session is already in changes nothing and asks nothing. Bypass is dimmed when the session
  * can't switch to it, with the reason in one line underneath. Fork: [bypass] false leaves Bypass
- * out, four segments (Settings → New sessions).
+ * out, four segments (each agent's settings on a server, "New sessions start in").
  */
 @Composable
 fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, bypassAvailable: Boolean = true, bypass: Boolean = true) {
