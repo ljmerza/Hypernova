@@ -336,7 +336,7 @@ fun SessionScreen(
     var follow by rememberSaveable { mutableStateOf(true) }
     FollowWithTheList(list) { follow = it }
     // Voice (ui/voice): the mic where Send is while the box is empty, its words into the draft.
-    val voice = rememberVoiceInput(hub, text = { draft }, setText = { draft = it }, onSend = { follow = true; send(false) })
+    val voice = rememberVoiceInput(hub, text = { draft }, setText = { draft = it }, onSend = { send(false) })
     LaunchedEffect(voice.available) { if (voice.available) voice.firstSeen() }
     // Keep the tail pinned while the keyboard slides in. Only growth needs a scroll:
     // when the padding shrinks, the list's own clamping keeps the tail in place.
@@ -396,7 +396,7 @@ fun SessionScreen(
     // Continue after the away stop is on its way: a second tap doesn't send a second "continue".
     var continuing by remember(sessionId) { mutableStateOf(false) }
     // A double tap on a chip (or Compact) sends once.
-    val quickSend = rememberQuickSend(hub, sessionId, onSent = { follow = true }, onBusy = { busy = it })
+    val quickSend = rememberQuickSend(hub, sessionId, onBusy = { busy = it })
     // "Show earlier" is the list's first item while it's there.
     val above = { if (hub.hasEarlier(sessionId)) 1 else 0 }
     val earlierAnchor = remember(sessionId) { mutableStateOf<String?>(null) }
@@ -597,7 +597,7 @@ fun SessionScreen(
                 if (pending != null) {
                     // Opening the terminal is where the text gets fixed: the card goes (a send that
                     // still meets text there brings it back).
-                    TerminalTextCard(pending, onReplace = { follow = true; send(true) }, onOpen = { busy = null; opener.terminal(sessionId) }, onDismiss = { busy = null })
+                    TerminalTextCard(pending, onReplace = { send(true) }, onOpen = { busy = null; opener.terminal(sessionId) }, onDismiss = { busy = null })
                     Spacer(Modifier.height(12.dp))
                 }
                 AnimatedVisibility(block != null, enter = fadeIn(tween(Motion.DIALOG)) + expandVertically(tween(Motion.REVEAL, easing = Motion.Expo)), exit = fadeOut(tween(Motion.DIALOG)) + shrinkVertically(tween(Motion.DIALOG))) {
@@ -715,9 +715,9 @@ fun SessionScreen(
                 hub, session, usage,
                 onModel = { modelOpen = true },
                 onSwitchAgent = { to -> sheetOpen = false; switching = to },
-                // After Allow & retry, to the chat: Claude runs it again there.
+                // The chat stays where it is: Claude runs it again there, with Jump to latest to go and see.
                 // The sheet stays while blocked calls are left to answer; it goes with the last.
-                onRetried = { follow = true },
+                onRetried = {},
                 onEmptied = { sheetOpen = false },
                 onDismiss = { sheetOpen = false },
                 atBlocked = sheetAtBlocked,

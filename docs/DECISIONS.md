@@ -4513,3 +4513,12 @@ The owner: "let's make sure that we are modularizing this correctly so shared co
 3. Shared logic only, with each system drawing its own screens: it can't break another system, but every feature gets built twice, which is what this is meant to avoid.
 
 The rules are in `CLAUDE.md`, "Architecture". `scripts/arch-check.py` and `:app:checkRuntimeClasspath` enforce them (`docs/PLATFORMS.md`, "The rules' checks"). Parts and state are shared; each system may lay them out its own way. Voice, the terminal, the camera, file picking and the widget stay per system.
+
+## Sending never moves the chat (2026-11-04)
+
+The owner: "if I scroll back somewhere and then try to send a command it'll automatically scroll all the way to the bottom I don't want to do this allow me to be able to send messages but it'll stay where I'm at the latest I can with this what's the latest button that appears".
+
+1. **On both clients, a send leaves the chat where it is.** Scrolled back, the owner stays there, the message goes out, and Jump to latest stays on offer. At the end, following carries on as before.
+2. **Every way of sending:** the box, voice, a quick prompt and Compact, Replace on the terminal's text card, and Allow & retry in the session sheet. None of them turns following on now.
+3. **What still goes to the end:** opening a session, Jump to latest, and scrolling down to the end by hand. Continue on a paused session and a limit card's move to another provider or model do too: those are the owner asking to carry on and see it, and they were left as they were.
+4. **The keyboard and a growing box** only move a list that's following already.

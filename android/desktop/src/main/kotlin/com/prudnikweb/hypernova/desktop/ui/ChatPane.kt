@@ -251,7 +251,7 @@ internal fun MouseSelectable(content: @Composable () -> Unit) {
  * goes through the same send as the phone's, so while the server is away it waits in the same queue, and shows as queued in the chat.
  */
 @Composable
-internal fun ChatBox(hub: Hub, s: Session, shell: Shell, following: ChatFollowing, box: FocusRequester, modifier: Modifier = Modifier) {
+internal fun ChatBox(hub: Hub, s: Session, shell: Shell, box: FocusRequester, modifier: Modifier = Modifier) {
     val sessionId = s.id
     val draft = ChatDrafts.of(sessionId)
     // Goes on with the session if a rewind replaces it (data/Attachments.kt, SessionCarry).
@@ -268,7 +268,7 @@ internal fun ChatBox(hub: Hub, s: Session, shell: Shell, following: ChatFollowin
         if (text.isBlank()) return
         ChatDrafts.set(sessionId, "")
         busy = null
-        following.on = true
+        // The chat stays where it is, scrolled back or not: docs/DECISIONS.md, "Sending never moves the chat".
         // Core's scope: leaving the session doesn't cancel the send.
         Core.scope.launch {
             sendPrompt(hub, sessionId, text, emptyList(), replace, onSwitch = { shell.choose(Core.activeId.orEmpty(), it) }, onBusy = { busy = it }, onFail = shell::say)

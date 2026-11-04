@@ -2,6 +2,9 @@ package com.prudnikweb.hypernova.desktop
 
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
@@ -539,6 +542,40 @@ class ChatTest {
         inChat(Ui.jump_latest.text()).assertIsDisplayed()
         inChat(Ui.jump_latest.text()).performClick()
         waitUntil("back at the end", 10_000) { runCatching { inChat("The newest words").assertIsDisplayed() }.isSuccess }
+    }
+
+    /** The first reply in view: its words and where it is. */
+    private fun ComposeUiTest.firstInView(): Pair<String, androidx.compose.ui.unit.Dp> {
+        val node = onAllNodes(hasText("Reply number", substring = true) and hasAnyAncestor(hasTestTag(CHAT_TAG))).onFirst()
+        val words = node.fetchSemanticsNode().config[SemanticsProperties.Text].joinToString("") { it.text }
+        return words to node.getUnclippedBoundsInRoot().top
+    }
+
+    /** The owner: "allow me to be able to send messages but it'll stay where I'm at". docs/DECISIONS.md, "Sending never moves the chat". */
+    @Test fun sendingWhileScrolledBackLeavesTheChatWhereItIs() = runDesktopComposeUiTest(1200, 800) {
+        history(long(120))
+        d.ok("POST", prompt, JSONObject().put("session", session("s1", state = "working", title = name)))
+        up()
+        onNode(hasTestTag(CHAT_TAG)).performMouseInput { moveTo(center); scroll(-30f) }
+        waitForIdle()
+        inChat(Ui.jump_latest.text()).assertIsDisplayed()
+        val (words, top) = firstInView()
+        box().performTextInput("carry on")
+        press(Key.Enter)
+        until("the prompt") { d.count("POST", prompt) == 1 }
+        until("it's in the chat") { Core.live?.transcript("s1")?.any { it is Item.User && it.text == "carry on" } == true }
+        waitForIdle()
+        assertEquals(top, inChat(words).getUnclippedBoundsInRoot().top)
+        inChat(Ui.jump_latest.text()).assertIsDisplayed()
+    }
+
+    @Test fun sendingAtTheEndKeepsFollowing() = runDesktopComposeUiTest(1200, 800) {
+        history(long(120))
+        d.ok("POST", prompt, JSONObject().put("session", session("s1", state = "working", title = name)))
+        up()
+        box().performTextInput("carry on")
+        press(Key.Enter)
+        waitUntil("followed", 10_000) { runCatching { inChat("carry on").assertIsDisplayed() }.isSuccess }
     }
 
     @Test fun pageUpFromTheScreensKeysMovesTheChat() = runDesktopComposeUiTest(1200, 800) {

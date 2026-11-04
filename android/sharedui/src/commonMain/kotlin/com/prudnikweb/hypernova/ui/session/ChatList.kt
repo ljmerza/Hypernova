@@ -243,9 +243,9 @@ internal fun fileEdits(items: List<Item>): Int = items.count { it is Item.Diff |
 /** A second tap on the same quick prompt (or Compact) within this long is the same tap. */
 private const val QUICK_AGAIN_MS = 1500L
 
-/** A quick prompt or Compact sent as it is, leaving the box alone. A double tap sends once. [onSent]: it's on its way. [onBusy]: text waiting in its terminal stopped it. */
+/** A quick prompt or Compact sent as it is, leaving the box alone and the chat where it is. A double tap sends once. [onBusy]: text waiting in its terminal stopped it. */
 @Composable
-internal fun rememberQuickSend(hub: Hub, sessionId: String, onSent: () -> Unit, onBusy: (String) -> Unit): (String) -> Unit {
+internal fun rememberQuickSend(hub: Hub, sessionId: String, onBusy: (String) -> Unit): (String) -> Unit {
     val opener = LocalOpener.current
     val toast = LocalToast.current
     val appScope = LocalAppScope.current
@@ -254,7 +254,6 @@ internal fun rememberQuickSend(hub: Hub, sessionId: String, onSent: () -> Unit, 
         val at = Core.platform.ticks.elapsed()
         last?.let { (t, whenSent) -> if (t == text && at - whenSent < QUICK_AGAIN_MS) return@quick }
         last = text to at
-        onSent()
         appScope.launch {
             hub.send(sessionId, text)
                 .onSuccess { id -> if (id != sessionId) opener.switchSession(id) }

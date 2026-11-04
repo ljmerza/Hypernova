@@ -171,7 +171,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             sheet = null
         }
     }
-    val quick = rememberQuickSend(hub, s.id, onSent = { following.on = true }, onBusy = shell::say)
+    val quick = rememberQuickSend(hub, s.id, onBusy = shell::say)
     CompositionLocalProvider(LocalUriHandler provides links) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val askMax = maxHeight * ASK_SHARE
@@ -204,7 +204,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                 }
                 // The status bar over the box, as on the phone; opened, it keeps to a share of the pane, and the chat has the rest.
                 ChatStatusBar(hub, s, status, Modifier.widthIn(max = PANE_MAX).fillMaxWidth().heightIn(max = statusMax))
-                ChatBox(hub, s, shell, following, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
+                ChatBox(hub, s, shell, box, Modifier.widthIn(max = PANE_MAX).fillMaxWidth())
             }
             // The session sheet beside the chat where there's room, so both can be read; else over it as the phone's card. The content is the same.
             if (open != null && beside) key(open) {
@@ -215,7 +215,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
                 ) {
                     SessionSheetBody(
                         hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
-                        onRetried = { following.on = true }, onEmptied = { sheet = null }, onDismiss = { sheet = null }, onMenu = { menuPage = it },
+                        onRetried = {},onEmptied = { sheet = null }, onDismiss = { sheet = null }, onMenu = { menuPage = it },
                         atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
                     )
                 }
@@ -225,7 +225,7 @@ private fun Details(hub: Hub, s: Session, shell: Shell, stale: Boolean, onBack: 
             if (open != null && !beside) key(open) {
                 SessionSheet(
                     hub, s, usage, onModel = { modelOpen = true }, onSwitchAgent = { shell.say(Ui.desk_switch_on_phone.text()) },
-                    onRetried = { following.on = true }, onEmptied = { sheet = null }, onDismiss = { sheet = null },
+                    onRetried = {},onEmptied = { sheet = null }, onDismiss = { sheet = null },
                     atBlocked = open == SheetAt.Blocked, atAgents = open == SheetAt.Agents, onCompact = { quick("/compact") },
                 )
             }
