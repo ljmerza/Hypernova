@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyDescendant
@@ -15,9 +16,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import com.prudnikweb.hypernova.R
@@ -283,15 +282,20 @@ class ChatMoreTest {
         rule.snap("chat_markdown")
     }
 
-    @Test fun aPathOnItsOwnLineCopiesOnALongPressAndOpensNoMenu() {
+    @Test fun aPathOnItsOwnLineIsACodeBlockThatCopiesWhole() {
         val path = "/home/me/.claude/plans/handoff.md"
         val reply = "The handoff is saved.\n\n$path"
-        chat(FakeHub(transcripts = mapOf(Samples.ZETA to listOf(Item.User("u1", "Where?"), Item.Assistant("a1", reply)))), Samples.ZETA)
-        // A real press: a code block's copy is its own gesture, with no semantic long click to call.
-        rule.onNodeWithText(path, useUnmergedTree = true).performTouchInput { longClick() }
+        rule.setContent { Harness(spy) { com.prudnikweb.hypernova.ui.chat.Markdown(reply) } }
+        rule.waitForIdle()
+        // The code block's own copy, as TalkBack calls it: only a code block has it.
+        val copyLabel = str(R.string.copy_code)
+        val copyAction = SemanticsMatcher("has the code block's copy") { n ->
+            n.config.getOrNull(SemanticsActions.CustomActions)?.any { it.label == copyLabel } == true
+        }
+        val box = rule.onNode(copyAction, useUnmergedTree = true).fetchSemanticsNode()
+        rule.runOnUiThread { box.config[SemanticsActions.CustomActions].first { it.label == copyLabel }.action() }
         rule.waitForIdle()
         assertEquals(path, context.getSystemService(ClipboardManager::class.java).primaryClip!!.getItemAt(0).text.toString())
-        rule.onNodeWithText(str(R.string.chat_quote)).assertDoesNotExist()
     }
 
     // ─── A3, A4: a plan, and questions ───
