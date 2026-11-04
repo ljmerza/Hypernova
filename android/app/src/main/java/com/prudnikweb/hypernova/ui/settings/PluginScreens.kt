@@ -59,6 +59,7 @@ import com.prudnikweb.hypernova.data.plugins
 import com.prudnikweb.hypernova.data.pluginsAvailable
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.FieldLabel
 import com.prudnikweb.hypernova.ui.components.GlassCard

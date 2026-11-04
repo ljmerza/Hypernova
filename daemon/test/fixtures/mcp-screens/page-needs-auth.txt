@@ -1,0 +1,10 @@
+  ⎿  webauth requires authentication. Use /mcp to authenticate.
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Webauth MCP Server
+   Status:           ⚠ needs authentication
+   Auth:             ✘ not authenticated
+   URL:              http://127.0.0.1:48518/mcp
+   Config location:  /tmp/hn-mcpm/claude/.claude.json [project: /tmp/hn-mcpm/proj2]
+   ❯ 1. Authenticate
+     2. Disable
+   ↑/↓ to navigate · Enter to select · Esc to back

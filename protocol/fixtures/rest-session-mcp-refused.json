@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "error": {
+    "code": "waiting",
+    "message": "Claude is showing something in the terminal (a question or a menu). Open the terminal to answer it, then try again."
+  }
+}

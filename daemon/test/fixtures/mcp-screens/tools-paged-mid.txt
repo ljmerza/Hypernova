@@ -1,0 +1,34 @@
+
+  ⎿  Failed to reconnect to broken: CONNECTION_CLOSED
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Tools for many
+   30 tools
+
+     ↑ 3 more
+     tool_03   read-only
+     tool_04   destructive
+     tool_05
+     tool_06   read-only
+     tool_07   destructive
+     tool_08
+     tool_09   read-only
+     tool_10   destructive
+     tool_11
+     tool_12   read-only
+     tool_13   destructive
+     tool_14
+     tool_15   read-only
+     tool_16   destructive
+     tool_17
+     tool_18   read-only
+     tool_19   destructive
+     tool_20
+     tool_21   read-only
+     tool_22   destructive
+     tool_23
+     tool_24   read-only
+     tool_25   destructive
+   ❯ tool_26
+     ↓ 3 more
+
+   ↑/↓ to navigate · Enter to select · Esc to back

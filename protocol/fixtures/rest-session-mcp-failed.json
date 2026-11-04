@@ -1,0 +1,113 @@
+{
+  "ok": true,
+  "action": "reconnect",
+  "name": "broken",
+  "outcome": "failed",
+  "said": "Failed to reconnect to broken",
+  "server": {
+    "name": "broken",
+    "status": "failed",
+    "source": "local",
+    "toolCount": null,
+    "actions": [
+      "reconnect",
+      "disable"
+    ],
+    "signIn": false
+  },
+  "reply": {
+    "agent": "claude",
+    "kind": "terminal",
+    "live": true,
+    "folder": "folder-app-parser-fix",
+    "servers": [
+      {
+        "name": "projsrv",
+        "status": "connected",
+        "source": "project",
+        "toolCount": 1,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "broken",
+        "status": "failed",
+        "source": "local",
+        "toolCount": null,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "many",
+        "status": "connected",
+        "source": "local",
+        "toolCount": 30,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "slowstart",
+        "status": "connected",
+        "source": "local",
+        "toolCount": 2,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "two words",
+        "status": "connected",
+        "source": "local",
+        "toolCount": 1,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "webauth",
+        "status": "connected",
+        "source": "local",
+        "toolCount": 1,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "usertiny",
+        "status": "connected",
+        "source": "user",
+        "toolCount": 1,
+        "actions": [
+          "reconnect",
+          "disable"
+        ],
+        "signIn": false
+      },
+      {
+        "name": "docs",
+        "status": "waiting",
+        "source": "project",
+        "toolCount": null,
+        "transport": "http",
+        "host": "docs.example.com",
+        "actions": [],
+        "signIn": false
+      }
+    ]
+  }
+}

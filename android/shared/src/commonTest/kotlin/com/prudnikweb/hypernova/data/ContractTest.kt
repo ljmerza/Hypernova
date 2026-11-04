@@ -759,6 +759,53 @@ class ContractTest {
         "rest-mcp-refused-run" to { o -> assertEquals("confirm_run", Api.errorOf(403, o.toString()).code) },
         "rest-mcp-file-changed" to { o -> assertEquals(AgentSettingRefused.FILE_CHANGED, Api.errorOf(409, o.toString()).code) },
         "rest-mcp-toggled" to { o -> assertTrue(o.bool("ok")); assertFalse(o.bool("enabled")) },
+        // One session's own connections (docs/PROTOCOL.md, "A session's MCP connections").
+        "rest-session-mcp-live" to { o ->
+            val r = SessionMcpLive.wire(o)
+            assertEquals(SessionMcp.TERMINAL, r.kind)
+            assertTrue(r.live)
+            val many = r.servers.single { it.name == "many" }
+            assertEquals(Mcp.CONNECTED, many.status)
+            assertEquals(30, many.toolCount)
+            assertEquals("local", many.source)
+            assertEquals(listOf(SessionMcp.RECONNECT, SessionMcp.DISABLE), many.actions)
+            assertEquals(Mcp.FAILED, r.servers.single { it.name == "broken" }.status)
+            assertEquals(null, r.servers.single { it.name == "broken" }.toolCount)
+        },
+        "rest-session-mcp-acted" to { o ->
+            val a = SessionMcpActed.wire(o)
+            assertEquals(SessionMcp.DONE, a.outcome)
+            assertEquals(SessionMcp.RECONNECT, a.action)
+            assertEquals("Successfully reconnected to many", a.said)
+            assertEquals(Mcp.CONNECTED, a.server?.status)
+            assertTrue(a.reply.servers.isNotEmpty())
+        },
+        "rest-session-mcp-failed" to { o ->
+            val a = SessionMcpActed.wire(o)
+            assertEquals(SessionMcp.FAILED, a.outcome)
+            assertEquals(Mcp.FAILED, a.server?.status)
+        },
+        "rest-session-mcp-tools" to { o ->
+            val tools = o.arr("tools").mapObjects(SessionMcp::tool)
+            assertEquals("tool_00", tools.first().name)
+            assertTrue(tools.first().readOnly)
+            assertTrue(tools[1].destructive)
+        },
+        "rest-session-mcp-unread" to { o ->
+            val r = SessionMcpLive.wire(o)
+            assertEquals("typing", r.unreadCode)
+            assertTrue(r.unreadWords!!.contains("unsent text"))
+            assertTrue(r.servers.isEmpty())
+        },
+        "rest-session-mcp-refused" to { o -> assertEquals("waiting", Api.errorOf(409, o.toString()).code) },
+        "rest-session-mcp-watched" to { o ->
+            val r = SessionMcpLive.wire(o)
+            assertEquals(SessionMcp.WATCHED, r.kind)
+            assertEquals(false, r.live)
+            assertTrue(r.servers.all { it.actions.isEmpty() })
+            assertEquals(listOf("create_issue", "list_issues"), r.servers.single { it.name == "github" }.tools.map { it.name })
+        },
+        "rest-session-mcp-not-here" to { o -> assertEquals("not_here", Api.errorOf(409, o.toString()).code) },
         "rest-mcp-reconnected" to { o -> assertEquals(Mcp.CONNECTED, o.obj("server")?.let(McpLiveReply::one)?.status) },
         "rest-mcp-not-trusted" to { o -> assertEquals("not_trusted", Api.errorOf(409, o.toString()).code) },
         "rest-mcp-list-undo" to { o ->

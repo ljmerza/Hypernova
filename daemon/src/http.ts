@@ -35,6 +35,7 @@ import { ATTACH_DIR, MAX_ATTACHMENT, attachmentFile, saveAttachment, withAttachm
 import { MAX_CLIENT_LOG, isClientLogType, saveClientLog, takeClientLogSlot } from './client-logs.ts'
 import { agentEvents, backgroundRunning, endSessionAgents, listAgents, validAgentId } from './agents.ts'
 import { sessionMcp } from './agent-settings.ts'
+import { sessionMcpAct, sessionMcpLive, sessionMcpTools } from './mcp-session.ts'
 import { extrasRoute } from './agent-extras.ts'
 import { startAgentUpdates, versionRoute } from './agent-update.ts'
 import { mcpRoute } from './mcp-routes.ts'
@@ -810,6 +811,18 @@ async function api(c: Ctx): Promise<void> {
     if (!rec) throw new HttpError(404, 'no_session', 'That session no longer exists.')
     if (isCodex(rec.id)) throw new HttpError(409, 'not_claude', 'Codex keeps its MCP servers elsewhere.')
     return json(res, 200, await sessionMcp(rec.cwd))
+  }
+  // A session's own MCP connections, and what can be done to them, for a paired phone (mcp-session.ts).
+  const ml = /^\/v1\/sessions\/([\w-]+)\/mcp\/live(\/tools)?$/.exec(path)
+  if (ml) {
+    if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
+    if (m === 'GET') return json(res, 200, ml[2] ? await sessionMcpTools(ml[1]!, url.searchParams.get('name') ?? '') : await sessionMcpLive(ml[1]!, { fresh: url.searchParams.get('fresh') === '1' }))
+    if (m === 'POST' && !ml[2]) {
+      const b = await readJsonBody(req)
+      const acted = await sessionMcpAct(ml[1]!, b?.action, b?.name)
+      broadcast({ t: 'agent_settings', agent: acted.reply.agent })
+      return json(res, 200, acted)
+    }
   }
   // The agents a session's main agent started, and one agent's own transcript (read-only).
   const ag = /^\/v1\/sessions\/([\w-]+)\/agents(?:\/([^/]+)\/events)?$/.exec(path)

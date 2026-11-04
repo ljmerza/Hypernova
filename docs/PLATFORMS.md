@@ -159,6 +159,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Cards above the sessions (account, providers, prompts for gone sessions, automation questions, outdated jobs) | Not yet | Tray alerts say an account needs its owner |
 | The menu: Rename, Stop, Remove from list | There | As buttons in the pane, with the phone's confirm and words. No Rename in History: it would resume the session |
 | The menu: Restart session, MCP servers | Not yet | |
+| The session sheet's MCP tab: its own connections, reconnect, off and on, sign in (`GET`/`POST /v1/sessions/{id}/mcp/live`; `SessionMcpLive` is in `android/shared`) | Not yet | |
 | Card swipes | Not meant to be | A pointer has the pane's buttons |
 | Keys: arrows, Enter, Escape, Tab, zoom | Desktop only | |
 

@@ -300,6 +300,43 @@ function liveOf(s: any, enabled: boolean): LiveServer | null {
   }
 }
 
+/** Tests play the daemon's connection to the shared app-server here. */
+const threadRpc: { call: ((method: string, params?: unknown) => Promise<any>) | null } = { call: null }
+export const useThreadRpc = (c: typeof threadRpc.call) => {
+  threadRpc.call = c
+}
+
+const RUNTIME: Record<string, LiveStatus> = { connected: 'connected', starting: 'pending', notStarted: 'pending', authenticationRequired: 'needs-auth', failed: 'failed', cancelled: 'failed', disabled: 'disabled' }
+
+/**
+ * Thread [threadId]'s own servers, from the app-server that has it loaded: `runtimeStatus` is that thread's connection (measured on 0.164.0: a server killed
+ * under it says `failed`, and the others stay `connected`). Null: no connection to the app-server, or the thread isn't loaded there ("thread not found").
+ */
+export async function codexThreadStatus(threadId: string): Promise<LiveServer[] | null> {
+  const c = threadRpc.call ?? connected()?.call.bind(connected())
+  if (!c) return null
+  const data: any[] = []
+  try {
+    let cursor: string | undefined
+    for (let i = 0; i < 20; i++) {
+      const r = await c('mcpServerStatus/list', { threadId, limit: 100, ...(cursor ? { cursor } : {}) })
+      if (Array.isArray(r?.data)) data.push(...r.data)
+      cursor = typeof r?.nextCursor === 'string' ? r.nextCursor : undefined
+      if (!cursor) break
+    }
+  } catch (e) {
+    const words = String((e as Error)?.message ?? e)
+    if (!/thread not found/i.test(words)) log('codex mcp: a thread’s status failed', maskText(words).slice(0, 200))
+    return null
+  }
+  return data.flatMap((s) => {
+    const live = liveOf(s, s?.runtimeStatus !== 'disabled')
+    if (!live) return []
+    const status = RUNTIME[String(s?.runtimeStatus)] ?? live.status
+    return [{ ...live, status, ...(status !== 'failed' ? { error: undefined } : {}) }]
+  })
+}
+
 /** GET /v1/agents/mcp/status?agent=codex. */
 export async function codexStatus(fresh = false) {
   const all = await readAll()
@@ -331,11 +368,16 @@ async function writeTable(name: string, value: RawConfig | null): Promise<void> 
   await reloadShared()
   liveCache = null
 }
-async function reloadShared(): Promise<void> {
+/** Whether the daemon's connection took it. No connection: there's nothing running here to tell. */
+export async function reloadShared(): Promise<boolean> {
+  const c = threadRpc.call ?? connected()?.call.bind(connected())
+  if (!c) return false
   try {
-    await connected()?.call('config/mcpServer/reload')
+    await c('config/mcpServer/reload')
+    return true
   } catch (e) {
     log('codex mcp: reload after a change failed', (e as Error)?.message ?? '')
+    return false
   }
 }
 

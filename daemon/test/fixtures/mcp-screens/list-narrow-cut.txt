@@ -1,0 +1,32 @@
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj3
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔ ◐ medium · /effort ▔
+   Manage MCP servers
+   41 servers
+     Local MCPs (/tmp/hn-mcpm/claude/.claude.json …
+   ❯ ✔ srv-00-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-01-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-02-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-03-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-04-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-05-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-06-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-07-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-08-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-09-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-10-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-11-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-12-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-13-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-14-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-15-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-16-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-17-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-18-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-19-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-20-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-21-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-22-with-a-rather-long-name-ind…   1 tool
+     ✔ srv-23-with-a-rather-long-name-ind…   1 tool
+     ↓ 17 more
+   https://code.claude.com/docs/en/mcp for help
+   ↑/↓ to navigate · Enter to confirm · Esc to cancel

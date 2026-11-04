@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "error": {
+    "code": "not_here",
+    "message": "This session’s terminal isn’t shared, so nothing here reaches its connections."
+  }
+}

@@ -49,7 +49,7 @@ the Android app's own.
      commands](#background-commands), [Automations](#automations)
    - Agents and models: [Codex](#codex-a-second-agent), [Switching agents](#switching-agents),
      [Providers](#providers), [Models](#models), [Agent settings](#agent-settings), [A session's MCP
-     servers](#a-sessions-mcp-servers), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
+     servers](#a-sessions-mcp-servers), [A session's MCP connections](#a-sessions-mcp-connections), [An agent's MCP servers](#an-agents-mcp-servers), [An agent's
      plugins](#an-agents-plugins), [An agent's skills](#an-agents-skills), [An agent's environment variables](#an-agents-environment-variables), [JSON mode](#json-mode), [Updating an agent](#updating-an-agent), [Session menu](#session-menu), [A session's
      model](#a-sessions-model), [A session's effort](#a-sessions-effort)
    - Account and limits: [Account](#account), [Auto-continue](#auto-continue), [Session usage and
@@ -1744,6 +1744,52 @@ SessionMcpReply = {
 }
 ```
 
+### SessionMcpLive
+
+The answer to `GET /v1/sessions/{id}/mcp/live`. Rules: see A session's MCP connections.
+
+```ts
+SessionMcpLive = {
+  agent: "claude" | "codex",
+  kind: "terminal" | "job" | "turn" | "rest" | "codex" | "watched" | "ended",
+  live: boolean,            // its own connections; false: what a new session, or its next turn, would get
+  folder: string,           // the folder's id, for Settings' sign-in and links
+  servers: {
+    name,
+    status: "connected" | "failed" | "needs-auth" | "pending" | "disabled" | "waiting" | "rejected",
+    source,                 // "project", "local", "user", "managed", "agent", "builtin", "plugin", "unknown"…
+    toolCount: number | null,
+    tools?: { name, readOnly?, destructive?, openWorld? }[],  // where the answer has them; else GET …/live/tools
+    error?,                 // masked
+    cut?: true,             // the terminal cut its name and no file has it: no actions
+    offForNew?: true,       // on in this session, off for new ones
+    transport?, command?, host?,  // SessionMcpReply's allow-list
+    actions: ("reconnect" | "enable" | "disable")[],
+    signIn: boolean,
+  }[],
+  unread?: { code, words }, // why there are no rows this time: waiting, typing, starting, not_sent, terminal_busy, unseen
+}
+```
+
+### SessionMcpActed
+
+The answer to `POST /v1/sessions/{id}/mcp/live`.
+
+```ts
+SessionMcpActed = {
+  ok: true, action, name,
+  outcome: "done"           // the state read back is what it was for
+         | "failed"         // it isn't
+         | "no_change"      // Claude Code said why not: `said`
+         | "unconfirmed"    // sent, and either the state couldn't be read back or nothing says it's a new connection
+         | "next_turn"      // nothing's connected now: the list changed, for its next turn
+         | "new_sessions",  // only the list changed, for new sessions; this one's connection wasn't touched
+  said?,                    // the agent's own words, masked
+  server: row | null,       // the row read back
+  reply: SessionMcpLive,
+}
+```
+
 ### McpList
 
 The answer to `GET /v1/agents/mcp`. Rules: see An agent's MCP servers.
@@ -2946,6 +2992,26 @@ An older daemon answers 404 to each. The first three: see Agent settings.
   allow-list, read-only.
 - **Refusals:** 404 `no_session`; 409 `not_claude` (a Codex session)
 - **Rules:** see A session's MCP servers.
+
+#### GET /v1/sessions/{id}/mcp/live
+
+- **Query:** `fresh=1`: where the rows come from a process of the daemon's own (`rest`, `watched`, `ended`, a thread not loaded), not its 20 s of memory.
+- **Answer:** `200 SessionMcpLive`. A terminal that can't be read this time is still 200, with `unread` and no rows.
+- **Refusals:** 401 `unauthorized` (a paired phone only); 404 `no_session`. An older daemon answers 404 `not_found`.
+- **Rules:** see A session's MCP connections.
+
+#### GET /v1/sessions/{id}/mcp/live/tools
+
+- **Query:** `name`
+- **Answer:** `200 { name, live, tools: { name, readOnly?, destructive?, openWorld? }[] }`
+- **Refusals:** 400 `bad_name`; 404 `no_session`, `no_server`; 409 as a terminal's `unread` codes.
+
+#### POST /v1/sessions/{id}/mcp/live
+
+- **Body:** `{ action: "reconnect" | "enable" | "disable", name }`
+- **Answer:** `200 SessionMcpActed`, and `{t:"agent_settings"}` to the other phones. A reconnect waits for the server: up to 45 s and a read back.
+- **Refusals:** 400 `bad_action`, `bad_name`; 404 `no_session`, `no_server` (not in this session: one added or approved since it started needs Restart session); 409 `waiting`, `typing`, `starting`, `not_sent`, `terminal_busy`, `unseen`, `no_terminal`, `cut_name`, `needs_approval`, and `not_here` (what nothing here reaches: a terminal not shared, an ended session, a reconnect between turns, Codex with no connection to its app-server).
+- **Rules:** see A session's MCP connections.
 
 ### Routes: agents' MCP servers
 
@@ -5713,9 +5779,33 @@ through `maskSecrets`, else it's left out. `.mcp.json` follows Agent settings' r
 file. Each read is per request and nothing is kept.
 
 The Android app (`ui/home/SessionMcp.kt`): a sheet from the Home card's menu, for a Claude session with a folder,
-and not from the chat's session sheet. Empty: "No MCP servers for this folder". On a 404 other than `no_session`
+and not from the chat's session sheet, whose MCP tab is A session's MCP connections. Empty: "No MCP servers for this folder". On a 404 other than `no_session`
 it says the server needs updating. A Codex session has no such item: its binary names a trusted repository's own
 `.codex/config.toml` for a project's MCP servers, not `~/.codex/config.toml`, and this doesn't read that file.
+
+### A session's MCP connections
+
+`daemon/src/mcp-session.ts`, `mcp-screen.ts`; docs/DECISIONS.md, "The session sheet's MCP tab", with what was measured. The session sheet's MCP tab. "An agent's MCP servers" below asks a process of its own and doesn't reach a running session; this is that session's own.
+
+| `kind` | What it is | How it's asked | Actions |
+|---|---|---|---|
+| `terminal` | A shared terminal | `/mcp` typed, read off the screen, closed with Esc while its dialog shows | `/mcp reconnect\|enable\|disable <name>` typed, at once while Claude works too |
+| `job` | A `claude agents` job | The same through `claude attach`, as a prompt goes | The same, on the job's process |
+| `turn` | An SDK session in a turn | `mcpServerStatus()` on that turn's process | `reconnectMcpServer()`, `toggleMcpServer()` on it |
+| `rest` | An SDK session between turns | It has no process: a process of the daemon's own, `live: false` | The folder's list, `next_turn`. No reconnect |
+| `codex` | A Codex thread | `mcpServerStatus/list` with its `threadId` on the daemon's connection; not loaded or no connection: Codex's own list, `live: false` | `enabled` in its one list, and `config/mcpServer/reload`. Reconnect is that reload, offered only for what's down |
+| `watched` | A terminal not shared | A process of the daemon's own, `live: false` | None: 409 `not_here` |
+| `ended` | Ended | The same | None: 409 `not_here` |
+
+**A look.** One at a time per terminal, and `watchMenus` leaves it alone meanwhile. Nothing's typed over words in the box or a dialog: `unread`, or that refusal. A list too long for the screen is paged through. A project's servers it never started (`/mcp` doesn't list them) come from `heldBack` as `waiting` or `rejected`, with no actions. A name the screen cut is made whole from the files, else `cut`.
+
+**What may leave.** Only what `mcp-screen.ts` picks out: a row's name, status and count, a page's options, a tool's name and hints. A page's command, URL and file lines are never read. Words of Claude Code's and errors go through `maskText`. Screens aren't logged.
+
+**What it leaves.** A typed action is a local command in the transcript, as in a terminal, so it shows in the chat and the model sees it under Claude Code's caveat. A look writes nothing to the transcript. Each goes in that terminal's ↑ history, and anyone at the terminal sees `/mcp` flick.
+
+**Signing in** is `POST /v1/agents/mcp/login` with the reply's `folder`, then a reconnect here, since a session takes a new sign-in only when it reconnects.
+
+The Android app: `ui/session/McpTab.kt`, `SheetTab.Mcp`, the sheet's tab after Agents. It looks as it opens and at Check again, and tools when they're opened. Shared with Settings: `ui/mcp/McpParts.kt`. A 404 `not_found` says the server needs updating, with no retry.
 
 ### An agent's MCP servers
 

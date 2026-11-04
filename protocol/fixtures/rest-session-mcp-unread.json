@@ -1,0 +1,11 @@
+{
+  "agent": "claude",
+  "kind": "terminal",
+  "folder": "folder-app-parser-fix",
+  "live": true,
+  "servers": [],
+  "unread": {
+    "code": "typing",
+    "words": "There’s unsent text in this session’s terminal on the server. Send or clear it there first."
+  }
+}

@@ -151,7 +151,7 @@ class SessionSheetTest {
     }
 
     @Test fun theTabsAreInTheOwnersOrder() {
-        assertEquals(listOf(SheetTab.Overview, SheetTab.Permissions, SheetTab.Agents, SheetTab.Commands, SheetTab.Session), SheetTab.entries.toList())
+        assertEquals(listOf(SheetTab.Overview, SheetTab.Permissions, SheetTab.Agents, SheetTab.Mcp, SheetTab.Commands, SheetTab.Session), SheetTab.entries.toList())
     }
 
     @Test fun theTabsAreAllAsWideAsTheWidestWhenThatFits() {

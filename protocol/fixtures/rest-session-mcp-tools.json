@@ -1,0 +1,98 @@
+{
+  "name": "many",
+  "live": true,
+  "tools": [
+    {
+      "name": "tool_00",
+      "readOnly": true
+    },
+    {
+      "name": "tool_01",
+      "destructive": true
+    },
+    {
+      "name": "tool_02"
+    },
+    {
+      "name": "tool_03",
+      "readOnly": true
+    },
+    {
+      "name": "tool_04",
+      "destructive": true
+    },
+    {
+      "name": "tool_05"
+    },
+    {
+      "name": "tool_06",
+      "readOnly": true
+    },
+    {
+      "name": "tool_07",
+      "destructive": true
+    },
+    {
+      "name": "tool_08"
+    },
+    {
+      "name": "tool_09",
+      "readOnly": true
+    },
+    {
+      "name": "tool_10",
+      "destructive": true
+    },
+    {
+      "name": "tool_11"
+    },
+    {
+      "name": "tool_12",
+      "readOnly": true
+    },
+    {
+      "name": "tool_13",
+      "destructive": true
+    },
+    {
+      "name": "tool_14"
+    },
+    {
+      "name": "tool_15",
+      "readOnly": true
+    },
+    {
+      "name": "tool_16",
+      "destructive": true
+    },
+    {
+      "name": "tool_17"
+    },
+    {
+      "name": "tool_18",
+      "readOnly": true
+    },
+    {
+      "name": "tool_19",
+      "destructive": true
+    },
+    {
+      "name": "tool_20"
+    },
+    {
+      "name": "tool_21",
+      "readOnly": true
+    },
+    {
+      "name": "tool_22",
+      "destructive": true
+    },
+    {
+      "name": "tool_23"
+    },
+    {
+      "name": "tool_24",
+      "readOnly": true
+    }
+  ]
+}

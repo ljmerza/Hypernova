@@ -62,6 +62,7 @@ class AppSpy {
         connectionLog = { opened += "connectionLog" },
         settings = { opened += "settings:$it" },
         signIn = { opened += "signIn" },
+        mcpServers = { opened += "mcpServers:$it" },
     )
 }
 

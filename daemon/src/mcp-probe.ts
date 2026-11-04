@@ -100,7 +100,7 @@ export const useProbe = (r: Runner | null) => {
 
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s)
 
-function liveOf(raw: any): LiveServer | null {
+export function liveOf(raw: any): LiveServer | null {
   const name = typeof raw?.name === 'string' ? raw.name : ''
   if (!LIVE_NAME.test(name) || maskSecrets(name) !== name) return null
   const known: LiveStatus[] = ['connected', 'failed', 'needs-auth', 'pending', 'disabled']

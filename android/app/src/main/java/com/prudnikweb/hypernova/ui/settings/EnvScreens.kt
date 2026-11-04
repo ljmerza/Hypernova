@@ -50,6 +50,7 @@ import com.prudnikweb.hypernova.data.envSet
 import com.prudnikweb.hypernova.data.envUndo
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
 import com.prudnikweb.hypernova.ui.components.Field
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.GlassSheet

@@ -1,0 +1,34 @@
+
+ ▐▛███▛█   Claude Code v2.1.317
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   /tmp/hn-mcpm/proj2
+
+
+
+
+
+
+
+
+
+
+ tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus trac… ▔
+   Manage MCP servers
+   7 servers
+
+     Project MCPs (/tmp/hn-mcpm/proj2/.mcp.json)
+   ❯ ✔ projsrv     1 tool
+
+     Local MCPs (/tmp/hn-mcpm/claude/.claude.json [project: /tmp/hn-mcpm/proj2])
+     ✘ broken
+     ✔ many        30 tools
+     ✔ slowstart   2 tools
+     ✔ two words   1 tool
+     ✔ webauth     1 tool
+
+     User MCPs (/tmp/hn-mcpm/claude/.claude.json)
+     ✔ usertiny    1 tool
+
+   ※ Run claude --debug to see error logs
+   https://code.claude.com/docs/en/mcp for help
+   ↑/↓ to navigate · Enter to confirm · Esc to cancel
