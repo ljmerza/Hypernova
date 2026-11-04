@@ -5,6 +5,91 @@ import com.prudnikweb.hypernova.R
 /** The string resource behind a [Str]: named in full, so R8 keeps what's used and drops the rest. */
 val Str.id: Int
     get() = when (this) {
+        Str.a11y_stats_days -> R.string.a11y_stats_days
+        Str.a11y_stats_days_none -> R.string.a11y_stats_days_none
+        Str.a11y_stats_hero -> R.string.a11y_stats_hero
+        Str.a11y_stats_hero_agents -> R.string.a11y_stats_hero_agents
+        Str.a11y_stats_hero_codex -> R.string.a11y_stats_hero_codex
+        Str.a11y_stats_next_day -> R.string.a11y_stats_next_day
+        Str.a11y_stats_prev_day -> R.string.a11y_stats_prev_day
+        Str.a11y_stats_split -> R.string.a11y_stats_split
+        Str.servers_all -> R.string.servers_all
+        Str.stats_agent_codex -> R.string.stats_agent_codex
+        Str.stats_agent_work -> R.string.stats_agent_work
+        Str.stats_agent_work_row -> R.string.stats_agent_work_row
+        Str.stats_agents -> R.string.stats_agents
+        Str.stats_agents_worked -> R.string.stats_agents_worked
+        Str.stats_ap_mac -> R.string.stats_ap_mac
+        Str.stats_ap_phone -> R.string.stats_ap_phone
+        Str.stats_approvals -> R.string.stats_approvals
+        Str.stats_bn -> R.string.stats_bn
+        Str.stats_busiest -> R.string.stats_busiest
+        Str.stats_by_clock -> R.string.stats_by_clock
+        Str.stats_by_clock_row -> R.string.stats_by_clock_row
+        Str.stats_by_hours -> R.string.stats_by_hours
+        Str.stats_by_voice -> R.string.stats_by_voice
+        Str.stats_claude_worked -> R.string.stats_claude_worked
+        Str.stats_codex_worked -> R.string.stats_codex_worked
+        Str.stats_counted_what -> R.string.stats_counted_what
+        Str.stats_day_codex_said -> R.string.stats_day_codex_said
+        Str.stats_day_no_hours -> R.string.stats_day_no_hours
+        Str.stats_day_none -> R.string.stats_day_none
+        Str.stats_day_said -> R.string.stats_day_said
+        Str.stats_error -> R.string.stats_error
+        Str.stats_files -> R.string.stats_files
+        Str.stats_footer -> R.string.stats_footer
+        Str.stats_footer_agents -> R.string.stats_footer_agents
+        Str.stats_footer_codex -> R.string.stats_footer_codex
+        Str.stats_from_phone -> R.string.stats_from_phone
+        Str.stats_h -> R.string.stats_h
+        Str.stats_hm -> R.string.stats_hm
+        Str.stats_k -> R.string.stats_k
+        Str.stats_last_days -> R.string.stats_last_days
+        Str.stats_later -> R.string.stats_later
+        Str.stats_limit_five -> R.string.stats_limit_five
+        Str.stats_limit_five_only -> R.string.stats_limit_five_only
+        Str.stats_limit_model -> R.string.stats_limit_model
+        Str.stats_limit_model_only -> R.string.stats_limit_model_only
+        Str.stats_limit_week -> R.string.stats_limit_week
+        Str.stats_limit_week_only -> R.string.stats_limit_week_only
+        Str.stats_limits -> R.string.stats_limits
+        Str.stats_loading -> R.string.stats_loading
+        Str.stats_loading_agents -> R.string.stats_loading_agents
+        Str.stats_loading_all -> R.string.stats_loading_all
+        Str.stats_loading_codex -> R.string.stats_loading_codex
+        Str.stats_longest -> R.string.stats_longest
+        Str.stats_m -> R.string.stats_m
+        Str.stats_mn -> R.string.stats_mn
+        Str.stats_old_mac -> R.string.stats_old_mac
+        Str.stats_on_server -> R.string.stats_on_server
+        Str.stats_projects -> R.string.stats_projects
+        Str.stats_prompts -> R.string.stats_prompts
+        Str.stats_quiet -> R.string.stats_quiet
+        Str.stats_quiet_today -> R.string.stats_quiet_today
+        Str.stats_range_all -> R.string.stats_range_all
+        Str.stats_range_month -> R.string.stats_range_month
+        Str.stats_range_today -> R.string.stats_range_today
+        Str.stats_range_week -> R.string.stats_range_week
+        Str.stats_range_ytd -> R.string.stats_range_ytd
+        Str.stats_records -> R.string.stats_records
+        Str.stats_said_hm -> R.string.stats_said_hm
+        Str.stats_sessions -> R.string.stats_sessions
+        Str.stats_since -> R.string.stats_since
+        Str.stats_span -> R.string.stats_span
+        Str.stats_stale -> R.string.stats_stale
+        Str.stats_streak -> R.string.stats_streak
+        Str.stats_streak_detail -> R.string.stats_streak_detail
+        Str.stats_streak_detail_agents -> R.string.stats_streak_detail_agents
+        Str.stats_streak_detail_codex -> R.string.stats_streak_detail_codex
+        Str.stats_today_tick -> R.string.stats_today_tick
+        Str.stats_tok_cache_read -> R.string.stats_tok_cache_read
+        Str.stats_tok_cache_write -> R.string.stats_tok_cache_write
+        Str.stats_tok_in -> R.string.stats_tok_in
+        Str.stats_tok_out -> R.string.stats_tok_out
+        Str.stats_tokens -> R.string.stats_tokens
+        Str.stats_tool_calls -> R.string.stats_tool_calls
+        Str.stats_work -> R.string.stats_work
+        Str.try_again -> R.string.try_again
         Str.activity_ended -> R.string.activity_ended
         Str.activity_error -> R.string.activity_error
         Str.activity_limit -> R.string.activity_limit
@@ -440,6 +525,13 @@ val Str.id: Int
 /** The plurals resource behind a [Plural]. */
 val Plural.id: Int
     get() = when (this) {
+        Plural.stats_active_days -> R.plurals.stats_active_days
+        Plural.stats_all_missing -> R.plurals.stats_all_missing
+        Plural.stats_needs_update -> R.plurals.stats_needs_update
+        Plural.stats_said_hours -> R.plurals.stats_said_hours
+        Plural.stats_said_minutes -> R.plurals.stats_said_minutes
+        Plural.stats_sessions_count -> R.plurals.stats_sessions_count
+        Plural.stats_streak_days -> R.plurals.stats_streak_days
         Plural.agent_tool_calls -> R.plurals.agent_tool_calls
         Plural.agents_count -> R.plurals.agents_count
         Plural.ask_show_all -> R.plurals.ask_show_all

@@ -607,7 +607,15 @@ private fun Screens(
                 // Fork: a new route each time it's opened, so each opening lands at the latest (SessionScreen).
                 is Route.Session -> SessionScreen(shown, r.id, onBack = { nav.pop() }, opening = System.identityHashCode(r))
                 // The one on screen's, or with All servers every one's, whichever is chosen when it's opened.
-                Route.Statistics -> com.prudnikweb.hypernova.ui.stats.StatsScreen(shown, onBack = { nav.pop() }, servers = if (all) vm.everyHub.map { (st, h) -> com.prudnikweb.hypernova.data.StatsServer(st.id, st.name, h) } else null)
+                Route.Statistics -> com.prudnikweb.hypernova.ui.stats.StatsScreen(
+                    shown, onBack = { nav.pop() },
+                    servers = if (all) vm.everyHub.map { (st, h) -> com.prudnikweb.hypernova.data.StatsServer(st.id, st.name, h) } else null,
+                    onHome = {
+                        nav.reset()
+                        homeTab.value = com.prudnikweb.hypernova.ui.home.Tab.Sessions
+                        toTop.value = true
+                    },
+                )
                 is Route.Files -> FilesScreen(shown, r, onBack = { nav.pop() })
                 is Route.FileView -> FileViewer(shown, r.path, onBack = { nav.pop() })
                 is Route.Web -> WebScreen(r.url, r.title, onBack = { nav.pop() }, preview = r.preview, port = r.port)

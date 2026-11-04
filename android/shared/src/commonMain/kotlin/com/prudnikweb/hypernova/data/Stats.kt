@@ -15,7 +15,7 @@ import java.time.LocalDate
 
 /**
  * The ranges the Statistics screen offers; [wire] is what `GET /v1/stats?range=` takes, and [days]
- * how many of the chart's last 30 days it can light (YTD fewer in January: [litDays]).
+ * how many of the chart's last 30 days it can light (YTD fewer in January: [DayChart.inRange]).
  */
 enum class StatsRange(val wire: String, val days: Int) {
     Today("today", 1), Week("week", 7), Month("month", 30), Ytd("ytd", 30), All("all", 30),

@@ -240,8 +240,10 @@ shot_changes() {
 
 shot_statistics() {
   home
-  # The planet at the top left.
-  tap_at 82 226
+  # A row on Settings' tab.
+  tap_text '^SETTINGS$'
+  settle 3
+  tap_text '^Statistics$'
   settle 5
   tap_text '^All$'
   settle 6

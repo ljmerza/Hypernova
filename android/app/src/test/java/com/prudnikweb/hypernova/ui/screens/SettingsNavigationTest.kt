@@ -146,6 +146,20 @@ class SettingsNavigationTest {
         rule.onNodeWithText(str(R.string.st_all_phone)).assertExists()
     }
 
+    @Test fun theLogoOnStatisticsGoesToTheSessionsList() {
+        pair("z2", sessions = listOf(session("s1", state = "working", title = "On z2")))
+        val vm = show()
+        settingsTab()
+        rule.onNodeWithText(str(R.string.stats_title)).performClick()
+        rule.waitForIdle()
+        assertEquals(Route.Statistics, vm.nav.top)
+        rule.onNode(hasContentDescription(str(R.string.home_mark_label))).performClick()
+        rule.waitForIdle()
+        // The whole way, past the Settings tab it was opened from.
+        assertEquals(Route.Home, vm.nav.top)
+        rule.onNodeWithText("On z2").assertIsDisplayed()
+    }
+
     @Test fun withAllServersItsRowSaysEveryServer() {
         pair("z2")
         pair("gym")
