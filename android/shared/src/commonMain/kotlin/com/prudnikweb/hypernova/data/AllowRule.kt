@@ -188,6 +188,9 @@ object Secrets {
     /** [s] with anything token-like masked, for prose: titles, a session's last words, a question. */
     fun mask(s: String): String = mask(s, command = false)
 
+    /** [s] masked as a command line, whole: the caller bounds how long it is. */
+    fun maskCommand(s: String): String = mask(s, command = true)
+
     /**
      * [s] masked as a command line (an approval's command, a tool's activity line): there a key's
      * value is a key, so any value goes but a shell variable ("$TOKEN", "${PASS}", "$(cat key)"),

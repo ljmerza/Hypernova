@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import type { WebSocket } from 'ws'
 import { CLAUDE_DIR, HOME, SUPPORT, findClaude, log, randomToken, readJson, trimText, writeText } from './util.ts'
 import { getManaged, getProvider, isClaudeEffort, isSdk, isSubscription, providerEnv, saveManaged, settings, saveSettings, useProvider } from './store.ts'
-import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, noteAgentJob, notePaste, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
+import { agentJobOf, ensureParsed, forgetPaste, getSession, isCodexRec, keepTyped, listSessionRecs, noteAgentJob, notePaste, noteScreenTokens, noteTermDialog, sessionAllowedTools, sessionAlwaysRules, sessionOfAgentJob, upsertSession, view } from './hub.ts'
 import { undelete } from './deleted.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { whyFromRules, type Why } from './why.ts'
@@ -20,7 +20,7 @@ import { promptTitle, typedCommand } from './normalize.ts'
 import { trialEnded } from './blockers.ts'
 import { noteTrialEnded } from './account.ts'
 import { fromBeforeBoot } from './reboot.ts'
-import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, loginScreen, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, type Permission, type TermMeta, type TermState } from './term/shared.ts'
+import { DATA, Frames, MSG, TERMS, boxLines, boxText, codexTuiArgs, frame, isWorking, loginScreen, menuOf, metaPath, modeOf, msg, newTermId, registryBusy, sessionEnv, sockPath, spawnHolder, spinnerOf, type Permission, type TermMeta, type TermState } from './term/shared.ts'
 import { CodexError, codexBinary, codexSocketPath, rpc } from './codex/client.ts'
 import { getThread } from './codex/threads.ts'
 import { isHiddenCwd } from './term/hidden.ts'
@@ -426,6 +426,9 @@ export async function watchMenus(): Promise<void> {
         const text = drifted ? '' : await screenOf(r.term.id)
         if (text === null) return
         const lines = text.split('\n')
+        // Its spinner's tokens, ahead of the transcript while a reply is being written (Session.turn).
+        const spinner = !drifted && r.state === 'working' ? spinnerOf(boxLines(lines)?.above ?? []) : null
+        if (spinner?.tokens != null) noteScreenTokens(r.id, spinner.tokens, spinner.seconds)
         let menu = menuOf(lines)
         const dialog = !!menu?.permission
         // Claude Code's own sign-in: the phone offers its own way through (docs/PROTOCOL.md, "Signing in again").

@@ -1,0 +1,16 @@
+[
+  { "line": "✢ Moonwalking… (8m 16s · ↓ 2.9k tokens)", "seconds": 496, "tokens": 2900, "from": "the owner's terminal, 2026-11-03" },
+  { "line": "✢ Flambéing… (1m 11s", "seconds": 71, "tokens": null, "from": "cut short, as term/shared.ts's isWorking notes" },
+  { "line": "✢ Brewing… (0s · ↓ 2 tokens)", "seconds": 0, "tokens": 2 },
+  { "line": "* Brewing… (17s · ↓ 2.9k tokens)", "seconds": 17, "tokens": 2900 },
+  { "line": "✢ Brewing… (running PostToolUse hook · 27s · ↓ 3.8k tokens)", "seconds": 27, "tokens": 3800 },
+  { "line": "· Proofing… (running UserPromptSubmit hook · 0s)", "seconds": 0, "tokens": null },
+  { "line": "✻ Roosting… (1m 3s · ↓ 2.9k tokens)", "seconds": 63, "tokens": 2900 },
+  { "line": "· Herding…", "none": true },
+  { "line": "✽ Composing… (0s · ↓ 293 tokens)", "seconds": 0, "tokens": 293 },
+  { "line": "✻ Worked for 26s · done 4:53 PM", "none": true },
+  { "line": "● Sleeping 26 · 22s", "none": true },
+  { "line": "  ⎿  $ sleep 26 (23s)", "none": true },
+  { "line": "                                                                                 ◐ medium · /effort", "none": true },
+  { "line": "  ⎿  Tip: Use /btw to ask a quick side question without interrupting Claude's current work", "none": true }
+]

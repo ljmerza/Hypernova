@@ -224,16 +224,17 @@ async function ok(p: Promise<{ status: number; json: any }>): Promise<any> {
 /** Every time on the wire becomes this one (2027-01-15): the app reads them as numbers, never compares them with its clock here. */
 const T = 1_800_000_000_000
 const TIMES = new Set([
-  'createdAt', 'lastActivityAt', 'ts', 'at', 'since', 'observedAt', 'expiresAt', 'turnStartedAt', 'startedAt', 'endedAt', 'resetsAt',
+  'createdAt', 'lastActivityAt', 'ts', 'at', 'since', 'observedAt', 'expiresAt', 'turnStartedAt', 'waitingSince', 'startedAt', 'endedAt', 'resetsAt',
   'checkedAt', 'updatedAt', 'askedAt', 'autoResumeAt', 'modelsObservedAt', 'mtime', 'until', 'lastSeenAt', 'answeredAt', 'sleepAt',
 ])
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi
 /** The session ids this file picks itself: kept as they are, so both suites can name them. */
 const MAIN = 'c0ffee00-0000-4000-8000-00000000c0de'
 const LIMITED = 'c0ffee00-0000-4000-8000-00000000beef'
+const IN_TURN = 'c0ffee00-0000-4000-8000-00000000f00d'
 /** The first session POST /v1/sessions starts (the stand-in's `claude --bg` names it). */
 const STARTED = 'c0ffee00-0000-4000-8000-00000000f001'
-const KEPT_IDS = new Set([MAIN, LIMITED, STARTED])
+const KEPT_IDS = new Set([MAIN, LIMITED, IN_TURN, STARTED])
 
 /**
  * [v] with what changes from run to run made fixed: times (by key), random UUIDs (numbered in the
@@ -1667,6 +1668,23 @@ test('GET /v1/files: a project folder, its folders first, a key file greyed', as
   // A folder's own size is the file system's (40 on tmpfs, 4096 on ext4): the phone never shows it.
   for (const e of listing.entries) if (e.kind === 'dir') e.size = 0
   contract('rest-files', listing)
+})
+
+test('{t:"session"} in a turn: Session.turn, what its opened status bar says', () => {
+  hub.upsertSession(IN_TURN, { cwd: limitCwd, origin: 'terminal', state: 'working', activity: 'Bash: gh run watch 123' })
+  hub.ensureParsed(hub.getSession(IN_TURN)!)
+  hub.startTool(IN_TURN, 'toolu_turn_1', 'Bash', { command: 'cd ~/Projects/app && gh run watch 123\necho done' })
+  hub.startTool(IN_TURN, 'toolu_turn_2', 'Bash', { command: 'npm test' })
+  hub.noteScreenTokens(IN_TURN, 2900)
+  contract('ws-session-turn', heard('session', (m) => m.session.id === IN_TURN))
+  // Stopped for the owner's answer: the clock holds (no call running here, so the step is gone too).
+  for (const id of ['toolu_turn_1', 'toolu_turn_2']) {
+    ;(hub.getSession(IN_TURN)!.parse!.byId.get(id) as { status: string }).status = 'done'
+    hub.emitEvent(IN_TURN, id)
+  }
+  hub.setState(IN_TURN, 'needs_you', 'wants to run git push')
+  contract('ws-session-turn-waiting', heard('session', (m) => m.session.id === IN_TURN))
+  hub.setState(IN_TURN, 'idle')
 })
 
 test('every fixture is one this file checks (none left over from a message that went)', (t) => {

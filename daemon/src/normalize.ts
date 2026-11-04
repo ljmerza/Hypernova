@@ -958,6 +958,12 @@ export type ParseState = {
   scripts: Map<string, string>
   /** When the latest turn started, as logged: a prompt, or a hidden one (a task notification). */
   turnAt: number
+  /** The output tokens of the main agent's replies since the turn at [outputOf] started ([turnOutput]). */
+  output: number
+  outputOf: number
+  /** The reply being counted: logged once per content block, its output may grow from one line to the next. */
+  outputMsg: string | null
+  outputMsgTokens: number
   /**
    * The session runs on the built-in provider (the owner's Claude login): an API error says
    * something about his account, not another provider's (the reader sets it).
@@ -1002,7 +1008,7 @@ export function newParseState(sidechain = false): ParseState {
   return {
     events: [], byId: new Map(), changed: new Set(), title: null, firstPrompt: null, firstCommand: null, lastText: null, cwd: null, model: null, modelAt: 0, lastTs: 0,
     queue: [], queueChanged: false, queueSeq: 0, drained: 0, absorbed: new Map(), claim: null, claimRewritten: null,
-    sidechain, links: [], taskSeen: new Map(), scripts: new Map(), turnAt: 0,
+    sidechain, links: [], taskSeen: new Map(), scripts: new Map(), turnAt: 0, output: 0, outputOf: 0, outputMsg: null, outputMsgTokens: 0,
     builtIn: true, movedAt: 0, builtInBefore: true, inherited: false, blocker: null, account: [], askedAt: 0,
   }
 }
@@ -1586,10 +1592,29 @@ export function feedLine(st: ParseState, o: any): void {
           noteAccount(st, { kind: 'healthy', at: st.askedAt || ts, model: msg.model })
         }
       }
+      countOutput(st, msg?.id ?? o.uuid, msg?.usage?.output_tokens)
       for (const b of blocks) feedAssistantBlock(st, msg?.id ?? o.uuid, b, ts, false)
       return
     }
   }
+}
+
+/** A reply's output tokens, into its turn's count, each reply once ([st.turnAt] moving on starts a new count). */
+function countOutput(st: ParseState, msgId: string, tokens: unknown): void {
+  if (typeof tokens !== 'number' || !(tokens > 0)) return
+  if (st.outputOf !== st.turnAt) Object.assign(st, { output: 0, outputOf: st.turnAt, outputMsg: null, outputMsgTokens: 0 })
+  if (msgId === st.outputMsg) st.outputMsgTokens = Math.max(st.outputMsgTokens, tokens)
+  else Object.assign(st, { output: st.output + st.outputMsgTokens, outputMsg: msgId, outputMsgTokens: tokens })
+}
+
+/**
+ * What the main agent has written this turn, as Claude Code's spinner counts it once a reply is whole
+ * ("↓ 2.9k tokens", 2.1.317): every reply's output tokens. A prompt it took in mid-turn (queued, a
+ * `queued_command` attachment) goes on counting, as the spinner does; one that starts a turn of its
+ * own (a user line, [ParseState.turnAt]) starts again from 0, as the spinner does too.
+ */
+export function turnOutput(st: ParseState): number {
+  return st.outputOf === st.turnAt ? st.output + st.outputMsgTokens : 0
 }
 
 export function feedAssistantBlock(st: ParseState, msgId: string, b: any, ts: number, streaming: boolean): void {

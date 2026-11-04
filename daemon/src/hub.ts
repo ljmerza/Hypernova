@@ -6,7 +6,7 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, readdirSync, s
 import { basename, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { CLAUDE_DIR, installedClaudeVersion, log, outdatedClaude, projectNameOf, projectSlug, trimText, tail } from './util.ts'
-import { fallbackTitle, feedLine, flushAbsorbed, isLauncher, newParseState, newToolEvent, queueNow, queueView, squash, type Claim, type Ev, type ParseState, type QueuedPrompt, type ToolEv } from './normalize.ts'
+import { fallbackTitle, feedLine, flushAbsorbed, isLauncher, maskSecrets, newParseState, newToolEvent, queueNow, queueView, squash, turnOutput, type Claim, type Ev, type ParseState, type QueuedPrompt, type ToolEv } from './normalize.ts'
 import { recordReading, rateFor, type Rate } from './usage-rate.ts'
 import { applyLinks, backgroundRunning, endSessionAgents, launchedInBackground } from './agents.ts'
 import { getManaged, isSdk, isSubscription, managedSessions, listDevices, settings } from './store.ts'
@@ -31,6 +31,10 @@ import type { Why } from './why.ts'
 import { deaths, jobEnd, type JobSeen } from './job-deaths.ts'
 
 export type SessionState = 'starting' | 'working' | 'needs_you' | 'idle' | 'error' | 'ended'
+/** The tool call a turn is on (docs/PROTOCOL.md, Session.turn). */
+export type TurnStep = { tool: string; command: string | null; startedAt: number; running: number }
+/** What the status bar's opened panel says of a turn under way (docs/PROTOCOL.md, Session.turn). */
+export type TurnNow = { waitedMs: number; waitingSince: number | null; tokens: number | null; step: TurnStep | null }
 export type Session = {
   id: string
   title: string
@@ -63,6 +67,8 @@ export type Session = {
    * Working card's "for 12 min".
    */
   turnStartedAt?: number | null
+  /** What the status bar's opened panel says of the turn under way (docs/PROTOCOL.md, Session.turn); absent out of a turn. */
+  turn?: TurnNow
   lastText: string | null
   activity: string | null
   pendingApprovalIds: string[]
@@ -139,7 +145,7 @@ export type Session = {
    */
   todo?: TodoNow | null
 }
-type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'died' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null }
+type Rec = Omit<Session, 'endedBy' | 'browsable' | 'outsideProjects' | 'switchedFrom' | 'switchedTo' | 'agentJob' | 'agentRunning' | 'died' | 'blockedCalls'> & { transcriptPath: string; parse: ParseState | null; offset: number; carry: Buffer; pid: number | null; turnWaits?: { ms: number; since: number | null }; liveTokens?: number; liveAt?: number; liveBase?: number }
 /** Run by Codex, not by Claude Code: no transcript, registry, hooks or terminal screen of Claude's to read. */
 export const isCodexRec = (r: { agent?: string }) => r.agent === 'codex'
 
@@ -285,7 +291,7 @@ export function transcriptPathFor(cwd: string, id: string): string {
 }
 
 export function view(r: Rec): Session {
-  const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, ...rest } = r
+  const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, turnWaits: _w, liveTokens: _lt, liveAt: _la, liveBase: _lb, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
   const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && !deletedOf(r.id) && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
@@ -382,7 +388,10 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
   else if (was !== null && was !== r.state) dbg('session', 'state', { session: id, from: was, to: r.state })
   // The turn's clock: from the moment it went into a turn (or the better time the patch brings:
   // Claude Code's registry stamp), kept through a stop for the owner's answer, until it's out of it.
-  if (patch.state) r.turnStartedAt = !inTurn(patch.state) ? null : (patch.turnStartedAt ?? turnSoFar ?? Date.now())
+  if (patch.state) {
+    r.turnStartedAt = !inTurn(patch.state) ? null : (patch.turnStartedAt ?? turnSoFar ?? Date.now())
+    noteTurnState(r, turnSoFar == null)
+  }
   // Running again (a prompt resumed it): no longer one a restart of the Mac cut short.
   if (patch.state && patch.state !== 'ended') runsAgain(id)
   // Ended: no dialog of its own waits any more.
@@ -400,6 +409,109 @@ export function upsertSession(id: string, patch: Partial<Rec> & { cwd?: string }
 /** In a turn: starting, working, or stopped in it for the owner's answer. */
 function inTurn(s: SessionState): boolean {
   return s === 'starting' || s === 'working' || s === 'needs_you'
+}
+
+/**
+ * Session.turn's clock: the stops for the owner's answer, as they start and end, which Claude Code's
+ * spinner doesn't count (measured on 2.1.317: 6s before a dialog that stood 25 seconds, 7s after it).
+ * A new turn starts its count, tokens and steps afresh.
+ */
+function noteTurnState(r: Rec, newTurn: boolean): void {
+  if (newTurn || !inTurn(r.state)) {
+    r.turnWaits = { ms: 0, since: null }
+    r.liveTokens = r.liveAt = r.liveBase = undefined
+  }
+  if (!inTurn(r.state)) {
+    toolStarts.delete(r.id)
+    r.turn = undefined
+    return
+  }
+  const w = (r.turnWaits ??= { ms: 0, since: null })
+  if (r.state === 'needs_you') w.since ??= Date.now()
+  else if (w.since != null) {
+    w.ms += Math.max(0, Date.now() - w.since)
+    w.since = null
+  }
+  r.turn = turnNow(r)
+}
+
+/** When each tool call under way really started, by session: Claude Code runs several of one reply in turn, and says so as each starts (PreToolUse). */
+const toolStarts = new Map<string, Map<string, number>>()
+
+/** The call Claude is on and how many commands run with it, from the session's events (one of theirs running, this turn's). */
+function stepNow(r: Rec): TurnStep | null {
+  const evs = r.parse?.events ?? []
+  const starts = toolStarts.get(r.id)
+  // A call some older turn left "running" (its claude was killed) isn't this one's: a reply's calls are logged a moment before the turn's state says so.
+  const from = (r.turnStartedAt ?? 0) - 5000
+  let at = -1
+  let on: ToolEv | null = null
+  let running = 0
+  for (let i = evs.length - 1, n = 0; i >= 0 && n < 400; i--, n++) {
+    const e = evs[i]!
+    if (e.kind !== 'tool' || e.status !== 'running' || e.ts < from) continue
+    // Running in the background: not a step of this turn (the session sheet's Agents tab has those).
+    if (isLauncher(e.name) && launchedInBackground(r.id, e.id)) continue
+    const began = starts?.size ? starts.get(e.id) : e.ts
+    if (began == null) continue
+    if (typeof e.input.command === 'string') running++
+    if (began > at) {
+      at = began
+      on = e
+    }
+  }
+  if (!on) return null
+  const command = typeof on.input.command === 'string' && on.input.command.trim() ? maskSecrets(on.input.command) : null
+  return { tool: on.name, command, startedAt: at, running }
+}
+
+/** Session.turn as it stands. */
+function turnNow(r: Rec): TurnNow {
+  const w = r.turnWaits ?? { ms: 0, since: null }
+  // A count from a prompt well before this turn started is the last turn's: this one's lines aren't read yet.
+  const read = r.parse && r.parse.turnAt >= (r.turnStartedAt ?? 0) - 2000 ? turnOutput(r.parse) : 0
+  const tokens = Math.max(read, r.liveTokens ?? 0)
+  return { waitedMs: w.ms, waitingSince: w.since, tokens: tokens > 0 ? tokens : null, step: stepNow(r) }
+}
+
+/** Session.turn worked out again after a transcript line or a tool's event; clients hear only when it says something new. */
+function refreshTurn(r: Rec): void {
+  if (!inTurn(r.state)) return
+  const t = turnNow(r)
+  if (JSON.stringify(t) !== JSON.stringify(r.turn ?? null)) upsertSession(r.id, { turn: t })
+}
+
+/** The least time between two readings of a spinner's tokens that reach the clients (the screen is looked at every 800 ms). */
+const SCREEN_TOKENS_MS = 5000
+/**
+ * Tokens read off a shared terminal's spinner (term/shared.ts, spinnerOf): ahead of the transcript
+ * while a reply is being written, where the transcript has nothing of it until a block is whole.
+ * One reading in 5 seconds at most, so a long reply isn't a broadcast per look. A reading whose own
+ * time is well past this turn's was taken before the turn changed: it's the last turn's tokens.
+ */
+export function noteScreenTokens(id: string, tokens: number, seconds: number | null = null): void {
+  const r = sessions.get(id)
+  if (!r || !inTurn(r.state)) return
+  const now = Date.now()
+  const w = r.turnWaits
+  const turnS = (now - (r.turnStartedAt ?? now) - (w?.ms ?? 0)) / 1000
+  if (seconds != null && seconds > turnS + 3) return
+  if (now - (r.liveAt ?? 0) < SCREEN_TOKENS_MS) return
+  r.liveAt = now
+  r.liveTokens = tokens
+  refreshTurn(r)
+}
+
+/**
+ * Codex's own count, which has no spinner or transcript to read: its thread's output tokens so far
+ * and those of the request just done ([last]). The first report of a turn says where the turn began.
+ */
+export function noteThreadOutput(id: string, total: number, last: number): void {
+  const r = sessions.get(id)
+  if (!r || !inTurn(r.state) || !(total >= 0)) return
+  r.liveBase ??= total - (last >= 0 ? last : 0)
+  r.liveTokens = total - r.liveBase
+  refreshTurn(r)
 }
 
 /** Claude's to-do list in short (Session.todo), worked out again after a to-do tool's event. */
@@ -451,6 +563,7 @@ export function ensureParsed(r: Rec): ParseState {
   st.queueChanged = true
   publishQueue(r)
   refreshTodo(r)
+  refreshTurn(r)
   return st
 }
 
@@ -555,6 +668,7 @@ function readNew(r: Rec, quiet = false): Set<string> {
     }
     if (Object.keys(patch).length) upsertSession(r.id, patch)
     applyAccount(r, st)
+    refreshTurn(r)
   }
   return touched
 }
@@ -708,6 +822,7 @@ export function putEvent(sessionId: string, ev: Ev): void {
   st.byId.set(ev.id, ev)
   broadcast({ t: 'event', sessionId, event: ev })
   if (isTodoEvent(ev)) refreshTodo(r)
+  if (ev.kind === 'tool') refreshTurn(r)
 }
 
 /** One last read of a terminal session's transcript (lines written just before it ended). */
@@ -752,6 +867,7 @@ export function emitEvent(sessionId: string, id: string): void {
   if (ev?.kind === 'tool' && r && !isCodexRec(r)) sawToolResult(sessionId, ev)
   // Its to-do list moved on (a transcript line, a hook's result, the SDK's message).
   if (r && isTodoEvent(ev)) refreshTodo(r)
+  if (r && ev?.kind === 'tool') refreshTurn(r)
 }
 
 export function notice(sessionId: string, text: string, tone: 'info' | 'warn' | 'error' = 'info'): void {
@@ -896,10 +1012,13 @@ export function startTool(sessionId: string, toolUseId: string, name: string, in
   const r = sessions.get(sessionId)!
   const st = ensureParsed(r)
   let ev = st.byId.get(toolUseId) as ToolEv | undefined
+  let starts = toolStarts.get(sessionId)
+  if (!starts) toolStarts.set(sessionId, (starts = new Map()))
+  starts.set(toolUseId, Date.now())
   if (!ev) {
     ev = newToolEvent(toolUseId, name, input, Date.now())
     putEvent(sessionId, ev)
-  }
+  } else refreshTurn(r)
   if (name === 'Bash') watchBashOutput(sessionId, ev)
   return ev
 }

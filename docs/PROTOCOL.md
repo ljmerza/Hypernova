@@ -514,6 +514,30 @@ Session = {
                               // restart) counts from Claude Code's registry stamp, statusUpdatedAt, else from
                               // then. The session sheet's "This turn" and Home's Working card's "for 12 min";
                               // absent: an older daemon
+  turn?: {                    // what the status bar's opened panel says of the turn under way (the Android app,
+                              // StatusModel.kt, barDetails); only in a turn, absent otherwise and from an older daemon
+    waitedMs: number,         // the stops for the owner's answer so far in this turn, ended ones. Claude Code's
+                              // spinner doesn't count them, turnStartedAt does. The turn's time as the terminal says
+                              // it: now - turnStartedAt - waitedMs - (now - waitingSince, if a stop goes on)
+    waitingSince: number | null,  // epoch ms: the stop going on (state needs_you); the clock stands still meanwhile
+    tokens: number | null,    // what the main agent has written this turn, as the spinner's "↓ 2.9k tokens": each
+                              // reply's output tokens from the transcript, the same on an SDK session; a shared
+                              // terminal's spinner, read off the screen, where that's ahead (a reply being written,
+                              // whose tokens the transcript doesn't have yet; so rounded as the screen shows it, "2.9k"
+                              // is 2900; one reading in 5 seconds at most); Codex's own count less where the turn began.
+                              // A prompt taken in mid-turn goes on counting, one with a turn of its own starts from 0,
+                              // both as the spinner does. Null until there's one
+    step: null | {            // the tool call it's on, the newest started of those running; null between calls.
+                              // A call in the background isn't one (the session sheet's Agents tab has those)
+      tool: string,           // "Bash", "Edit"
+      command: string | null, // its command whole, lines and all, masked (normalize.ts, maskSecrets), at most 2,000
+                              // characters as tool events keep it; null for a tool with none (activity says that one)
+      startedAt: number,      // epoch ms: when it really started (PreToolUse), else when it was logged
+      running: number         // how many commands run at once, this one too: started and not finished. Claude Code
+                              // runs some of one reply in turn (those not read-only, measured on 2.1.317): those not
+                              // started aren't counted, though its own row counts all of a run, finished ones too
+    }
+  },                          // Changes at most as often as tool calls and replies do, so no broadcast per spinner frame
   lastText: string | null,    // last assistant text, trimmed to 200 chars
   activity: string | null,    // what it's doing now, e.g. "Bash: ./gradlew build"
   todo: null | {active: string | null, done: number, total: number},
@@ -4084,6 +4108,10 @@ For the daemon and `hn`, not for a client.
 - **Reasons when it doesn't:** `no_input` (a dialog or menu is showing), `busy_input` (unsent text
   in the box; `text` is that text), `not_started`, `not_seen`, `not_sent` (the box didn't empty
   after Enter).
+- **The spinner's tokens:** `spinnerOf` (`term/shared.ts`) reads the turn's time and tokens from the lines above the
+  box, "✢ Moonwalking… (8m 16s · ↓ 2.9k tokens)", "✢ Brewing… (running PostToolUse hook · 27s · ↓ 3.8k tokens)" (2.1.317;
+  `daemon/test/fixtures/spinner-screens`). A part that doesn't read is left out, whatever the wording does next. Only
+  the tokens are used (`Session.turn.tokens`), the time only to tell a reading from before the turn changed.
 - **While Claude works:** the input box is still there, under the spinner. Enter queues the prompt
   in Claude Code (the box empties all the same) and `pasted` says `queued: true`; Claude gets it
   when the step it's on finishes (see Reading transcripts). The daemon also checks Claude Code's

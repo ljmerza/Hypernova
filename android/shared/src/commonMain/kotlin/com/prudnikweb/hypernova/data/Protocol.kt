@@ -106,6 +106,8 @@ data class WSession(
     val turnStartedAt: Long? = null,
     /** Claude's to-do list in short (docs/PROTOCOL.md, Session.todo); null: none, or an older Mac. */
     val todo: TodoNow? = null,
+    /** The turn under way (docs/PROTOCOL.md, Session.turn); null: out of a turn, or an older Mac. */
+    val turn: TurnNow? = null,
 )
 
 /**
@@ -693,6 +695,18 @@ object Wire {
             todo = o.obj("todo")?.let { t ->
                 val total = t.int("total") ?: 0
                 if (total > 0) TodoNow(t.str("active")?.takeIf { it.isNotBlank() }, (t.int("done") ?: 0).coerceIn(0, total), total) else null
+            },
+            turn = o.obj("turn")?.let { t ->
+                TurnNow(
+                    waitedMs = (t.long("waitedMs") ?: 0L).coerceAtLeast(0L),
+                    waitingSince = t.long("waitingSince")?.takeIf { it > 0 },
+                    tokens = t.long("tokens")?.takeIf { it > 0 },
+                    step = t.obj("step")?.let { s ->
+                        s.long("startedAt")?.takeIf { it > 0 }?.let { at ->
+                            TurnStep(s.str("tool").orEmpty(), s.str("command")?.takeIf { it.isNotBlank() }, at, (s.int("running") ?: 0).coerceAtLeast(0))
+                        }
+                    },
+                )
             },
         )
     }

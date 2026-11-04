@@ -27,6 +27,12 @@
     "blocked": null,
     "automation": null,
     "turnStartedAt": 1800000000000,
+    "turn": {
+      "waitedMs": 0,
+      "waitingSince": null,
+      "tokens": null,
+      "step": null
+    },
     "endedBy": null,
     "browsable": true,
     "outsideProjects": false,
