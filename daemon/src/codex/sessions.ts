@@ -288,6 +288,19 @@ export async function promptCodex(id: string, text: string, clientId?: string): 
 }
 
 /**
+ * A prompt out of this session's line, by its id, and with [behind] the ones after it too, in order
+ * (queue-edit.ts). Null when it isn't there: it has started.
+ */
+export function takeCodexQueued(id: string, queueId: string, behind: boolean): QueueEntry[] | null {
+  const q = queues.get(id)
+  const at = q?.findIndex((e) => e.id === queueId) ?? -1
+  if (!q || at < 0) return null
+  const out = q.splice(at, behind ? q.length : 1)
+  publishQueue(id)
+  return out
+}
+
+/**
  * The prompts in line go, one turn at a time, while nothing runs. One Codex refuses is given back
  * (named, so the phone takes its text back), and the next goes.
  */

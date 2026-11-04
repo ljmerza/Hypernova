@@ -25,7 +25,8 @@
     "term": {
       "id": "term-id",
       "mac": 0,
-      "phone": 0
+      "phone": 0,
+      "unqueue": true
     },
     "menu": null,
     "agentsRunning": 0,
@@ -39,6 +40,7 @@
     "agentJob": "eff00001",
     "agentRunning": true,
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   },
   "applies": "now"

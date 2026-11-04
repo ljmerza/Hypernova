@@ -964,6 +964,8 @@ export type ParseState = {
   /** The queue changed since the reader last looked; it clears this once it has. */
   queueChanged: boolean
   queueSeq: number
+  /** While the daemon takes the queue out itself (queue-edit.ts): what comes back, with no notice to the owner. */
+  popCatch?: QueueEntry[] | null
   /**
    * Dequeue entries whose prompt hasn't come yet. Claude Code logs one as the queue's oldest
    * prompt starts a turn (several back to back for task notifications), and that prompt's user
@@ -1460,7 +1462,9 @@ function feedQueue(st: ParseState, o: any, ts: number): void {
       }
       // One whose text wasn't logged, back on its own: the text is its.
       if (content && back.length === 1 && unknown(back[0]!)) back[0]!.content = content
-      unsent(st, ts, 'returned', back)
+      // The daemon took them out itself and puts them back (queue-edit.ts): nothing went back to the owner.
+      if (st.popCatch) st.popCatch.push(...back)
+      else unsent(st, ts, 'returned', back)
       return
     }
   }

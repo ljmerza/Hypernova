@@ -1,0 +1,7 @@
+{
+  "status": 404,
+  "error": {
+    "code": "no_queued",
+    "message": "That message isn’t queued any more: Claude has it."
+  }
+}

@@ -40,6 +40,7 @@
     "agentJob": "stop0001",
     "agentRunning": true,
     "blockedCalls": 0,
+    "queueEdit": true,
     "todo": null
   }
 }

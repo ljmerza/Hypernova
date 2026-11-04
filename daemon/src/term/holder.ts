@@ -197,7 +197,7 @@ function onFrame(c: Client, type: number, p: Buffer): void {
       c.at = c.role === 'tty' || (c.role === 'phone' && !viewers('tty')) ? Date.now() : 0
       clients.add(c)
       // caps: what this holder can do (the daemon does it itself for holders started before).
-      write(c, msg({ t: 'hello', v: 1, id: spec.id, caps: ['replace', 'mode', 'queued'], unicode: term.unicode.activeVersion, ...state() }))
+      write(c, msg({ t: 'hello', v: 1, id: spec.id, caps: ['replace', 'mode', 'queued', 'unqueue'], unicode: term.unicode.activeVersion, ...state() }))
       if (c.role === 'control') {
         c.ready = true
       } else {
@@ -239,6 +239,9 @@ function onFrame(c: Client, type: number, p: Buffer): void {
       typing = typing.then(() => typeText(text, replace)).then((r) => write(c, msg({ t: 'pasted', id: m.id ?? null, ...r })))
       return
     }
+    case 'unqueue':
+      typing = typing.then(() => takeQueue()).then((r) => write(c, msg({ t: 'pasted', id: m.id ?? null, ...r })))
+      return
     case 'mode': {
       const want = String(m.mode ?? '')
       typing = typing.then(() => switchMode(want)).then((r) => write(c, msg({ t: 'moded', id: m.id ?? null, ...r })))
@@ -525,6 +528,30 @@ async function typeText(text: string, replace = false): Promise<Typed> {
     return { ok: false, reason: 'not_sent' }
   }
   return { ok: false, reason: 'not_seen' }
+}
+
+/**
+ * Claude Code's queue, out: the Up arrow in an empty box brings back all of it, one line each (no way
+ * to reach one entry: measured on 2.1.318), and Ctrl+U empties the box again, a line at a time, without
+ * touching Claude's turn as Ctrl+C would. With no queue left to bring back, Up recalls an old prompt
+ * instead, which goes the same way. What came out is logged in the transcript as `popAll`.
+ */
+async function takeQueue(): Promise<Typed> {
+  if (!child) return { ok: false, reason: 'not_started' }
+  const box = findBox()
+  if (box === null) return { ok: false, reason: 'no_input' }
+  if (box.text) return { ok: false, reason: 'busy_input', text: box.text.slice(0, 500) }
+  child.write('\x1b[A')
+  for (let i = 0; i < 15 && inputBox() === ''; i++) await sleep(100)
+  for (let i = 0; i < 200; i++) {
+    const t = inputBox()
+    if (t === null) return { ok: false, reason: 'no_input' }
+    if (t === '') return { ok: true }
+    if (!child) return { ok: false, reason: 'not_started' }
+    child.write('\x15')
+    await sleep(60)
+  }
+  return { ok: false, reason: 'not_sent' }
 }
 
 /**

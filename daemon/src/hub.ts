@@ -24,7 +24,8 @@ import { folderView } from './files.ts'
 import { bypassBlockedByRoot } from './platform.ts'
 import { linkOf } from './switch-links.ts'
 import { blockedCount, forgetBlocked, noteBlocked, onBlockedChange, sawToolResult, takeRetryGrant } from './blocked.ts'
-import { heldView, type HeldView } from './held.ts'
+import { heldView, moveHeld, type HeldView } from './held.ts'
+import { linkCleared } from './cleared.ts'
 import { TODO_TOOLS, todoNow, type TodoNow } from './todos.ts'
 import { ruleString, type AlwaysChoice, type AlwaysScope } from './always.ts'
 import type { Why } from './why.ts'
@@ -143,6 +144,8 @@ export type Session = {
   question?: string | null
   /** Fork: prompts held until Claude Code's input box is back (held.ts), oldest first. Absent when none. */
   held?: HeldView[]
+  /** One entry of [queue] can be removed or taken out to edit (queue-edit.ts). Absent: a holder started before it could. */
+  queueEdit?: true
   /**
    * Claude's to-do list in short (todos.ts, [todoNow]): the item under way, done and total. Home's
    * Working card says "Running the tests 3/7" with it. Null when Claude made none.
@@ -298,7 +301,7 @@ export function view(r: Rec): Session {
   const { transcriptPath: _t, parse: _p, offset: _o, carry: _c, pid: _pid, turnWaits: _w, liveTokens: _lt, liveAt: _la, liveBase: _lb, ...rest } = r
   // Only sessions that switched agents carry the links, so nothing changes for the others.
   const link = linkOf(r.id)
-  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && !deletedOf(r.id) && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), todo: r.todo ?? null }
+  const s: Session = { ...rest, turnStartedAt: rest.turnStartedAt ?? null, endedBy: rest.state === 'ended' && !deletedOf(r.id) && cutByRestart(r.id) ? 'mac_restart' : null, ...folderView(r.cwd), ...(link.from ? { switchedFrom: link.from } : {}), ...(link.to ? { switchedTo: link.to } : {}), ...(agentJobs.has(r.id) ? { agentJob: agentJobs.get(r.id), agentRunning: r.pid != null } : {}), ...(agentDied.has(r.id) ? { died: { reason: agentDied.get(r.id) ?? null } } : {}), blockedCalls: blockedCount(r.id), ...heldView(r.id), ...(r.term?.unqueue || agentJobs.has(r.id) || isSdk(r.id) || isCodexRec(r) ? { queueEdit: true } : {}), todo: r.todo ?? null }
   return { ...s, blocked: resume.view(s), bypassAvailable: s.bypassAvailable || s.permissionMode === 'bypassPermissions', pendingApprovalIds: [...pending.values()].filter((p) => p.approval.sessionId === r.id).map((p) => p.approval.id) }
 }
 
@@ -827,6 +830,14 @@ export function putEvent(sessionId: string, ev: Ev): void {
   broadcast({ t: 'event', sessionId, event: ev })
   if (isTodoEvent(ev)) refreshTodo(r)
   if (ev.kind === 'tool') refreshTurn(r)
+}
+
+/** A read of session [id]'s transcript now, not at the next poll: what its queue holds this moment (queue-edit.ts). */
+export function readQueueNow(id: string): void {
+  const r = sessions.get(id)
+  if (!r?.parse) return
+  for (const t of readNew(r)) emitEvent(id, t)
+  publishQueue(r)
 }
 
 /** One last read of a terminal session's transcript (lines written just before it ended). */
@@ -1752,6 +1763,11 @@ function questionOf(id: string): string | null {
   return n && !dialogNeeds(n) ? n : null
 }
 
+/** /clear in a job: it goes on under session [to]. What waited for the old one goes with it. */
+function jobMoved(job: string, to: string): void {
+  for (const [sid, j] of agentJobs) if (j === job && sid !== to && linkCleared(sid, to)) moveHeld(sid, to)
+}
+
 /**
  * The whole `claude agents` list (settings.claudeAgents): every job is a session here, whether or
  * not its process still runs, so a finished one stays on Home (at the bottom, done) rather than
@@ -1771,6 +1787,7 @@ export function applyAgentList(list: AgentJob[]): void {
     if (removed && (typeof j.startedAt !== 'number' || stoppedProcess(removed, j.pid, j.startedAt))) continue
     if (removed) undelete(j.sessionId)
     seen.add(j.sessionId)
+    jobMoved(j.id, j.sessionId)
     agentJobs.set(j.sessionId, j.id)
     // Resumed with no prompt yet: `claude agents` calls that blocked, and nothing is asked of the owner.
     // Nor once the login it says it needs is back: its state file says so until its next prompt.
@@ -1916,7 +1933,10 @@ export function pollRegistry(): void {
     if (deleted && stoppedProcess(deleted, o.pid, o.startedAt)) continue
     if (deleted) undelete(o.sessionId)
     live.add(o.sessionId)
-    if (agents) agentJobs.set(o.sessionId, o.jobId)
+    if (agents) {
+      jobMoved(o.jobId, o.sessionId)
+      agentJobs.set(o.sessionId, o.jobId)
+    }
     const r = sessions.get(o.sessionId) ?? upsertSession(o.sessionId, { cwd: o.cwd, origin: 'terminal', lastActivityAt: Number(o.statusUpdatedAt ?? o.updatedAt) || Date.now() })
     // Before the first read: whether Claude Code is busy says whether a queue read from the file still holds.
     r.pid = o.pid
