@@ -2015,7 +2015,7 @@ shows none" (The session sheet, 3).
    `additionalDirectories`), cut to size: settings files hold secrets (`env`, `apiKeyHelper`, MCP
    servers). Only the fixed files for the session's own folder are read; the route takes no path
    (docs/PROTOCOL.md, "Rules in effect").
-3. **Read-only for now:** adding and removing rules is PA1, the owner's call.
+3. **Read-only for now:** adding and removing rules is PA1, the owner's call. The owner made it for the user-level file: "Permission rules, edited" (2026-11-04). This part stays read-only.
 
 ## claude agents on by default (2026-10-30)
 
@@ -4604,6 +4604,34 @@ The owner: "but don't add fingerprinting needed", then, asked about the existing
 9. **The risk, stated plainly,** is in `docs/SECURITY-MODEL.md`, section 6: anyone holding an unlocked phone or at a paired device can now choose Bypass, install a plugin, loosen permissions or set a hook, with one tap, and that runs code on the server. The old check was only in the client.
 
 **This replaces:** "Android and connection" ("A biometric check guards..."); "The owner's morning answers", 2; "The owner's afternoon answers", 3, for the prompt's part; "Default mode for new sessions", 3, for why (Bypass still isn't a default); "What Always covers, and allowing several", for the fingerprint after the sheet; "The widget: Needs you", 4's last line; "The agents' settings, edited"; "Managing MCP servers from the phone"; "Plugins from the phone", 2, 3 and 7; "Environment variables from the phone", 3; "JSON mode", 4; "The desktop client's New session", 1; "Updating Claude Code and Codex", 6; "The session sheet's MCP tab", 10. In each of those a fingerprint now reads as the confirm. Those sections stay as they were written, and so do `docs/specs/spec-automations.md` and `docs/specs/workflows.md`, which are research.
+
+## Permission rules, edited (2026-11-04)
+
+The owner, of Claude Code's settings, where "Permission rules" only showed counts: "also expand on the permissions being able to add or edit, etc". And, on what it asks: "but don't add fingerprinting needed". This is the step "Rules in effect", 3, left for later. `daemon/src/agent-rules.ts`, `daemon/src/rule-text.ts`; the screen's parts are `sharedui`'s `ui/settings/AgentRulesParts.kt`.
+
+1. **A screen, from the Permission rules row under "Also in the file".** See the rules by Allow, Ask and Deny, search all three, add, edit, delete, and move one between lists. The row keeps its counts and now opens the screen. With no file there's no such section, so the row stands alone: adding a rule is how the file gets made. Codex's says it has no such lists.
+2. **User-level only:** `permissions.allow`, `ask` and `deny` of `~/.claude/settings.json`. Project rules aren't shown here. The screen says so and points at the session's sheet, which shows the ones in effect.
+3. **A one-tap confirm, by the owner's choice, on the phone and the desktop alike,** as "No fingerprints or screen locks" has it for the rest. Adding to Allow, taking one off Ask or Deny, editing one, and a move towards Allow all loosen, so the server refuses them without `confirmed` (403 `confirm_needed`), with words saying what the change does. The app shows those words on the confirm. So nothing loosens by accident, and it stops nobody holding the device: `docs/SECURITY-MODEL.md`, 25. Tightening asks nothing. Undo is judged the same way, since undoing a tightening loosens. The desktop does all of it too, so it isn't sent to the phone.
+4. **A broad rule says plainly what it does.** `Bash`, `Bash(*)`, a program that runs anything (`Bash(python *)`, `sudo`, `ssh` and so on), `Edit` or `Read` of everything, `WebFetch`, a whole MCP server. It's a judgment from a short list, in `broadWords`: a rule off the list asks as any Allow does.
+5. **What Claude Code does with a rule, measured** on 2.1.317 and 2.1.318 in a throwaway home with a scripted API:
+
+   | | |
+   |---|---|
+   | Precedence | Deny beats Ask, Ask beats Allow, whichever is the wider (`ask: [Bash]` over `allow: [Bash(x)]` asks; `deny: [Bash(x)]` over `allow: [Bash]` refuses) |
+   | `deny: [Bash]` | The tool is gone: "No such tool available" |
+   | A bad rule (`Bash(`, `bash`, `Bash()`, `WebFetch(https://x)`, a number) | Skipped alone, silently at the start of a session, listed by `claude doctor`. The rest of the file holds |
+   | A list that isn't a list (`ask: "x"`) | "Files with errors are skipped entirely", and an interactive start stops on a dialog. So a change here refuses to touch that list |
+   | A file that isn't JSON | No rules from it, nothing said in print mode |
+   | Spaces round a rule | It's malformed, so the server trims what's typed |
+   | `Write(path)`, `Glob(path)` | Accepted and never match; `Edit(path)` or `Read(path)` do |
+   | A running interactive session | Takes a change at its next call, even between two calls of one turn, in Allow, Ask and Deny alike. On both versions it still had the old rule straight away and at 500 ms, and had the new one from about 1 second, with the file quiet beforehand. Taking a rule off Allow and calling 5 seconds later asked every time: 12 of 12 on each version. A first version of this measurement showed a session stuck on the old rule, but that stopped once the script waited for the permission dialog to close before typing again. Most likely its typing was answering the dialog, though that wasn't proven |
+
+   The screen says: "A running session takes a change within a few seconds, from its next call." Not measured: a session under the SDK, or `claude agents` jobs.
+6. **The check is Claude Code's own, written out again** (`Tke` in 2.1.317's binary) because no command answers for one rule. `test/rules-e2e.test.ts` holds it to what `claude doctor` says it skips, so a Claude Code that moves fails that test here, though not on CI, which has none. **A bad rule is refused with why, and can be kept with Save as typed**, for a syntax newer than the check. A rule that the check accepts but doesn't know the tool of is saved with a note. Refusing outright would have been simpler, but then this screen could be wrong about a newer Claude Code with no way round it. A bad Deny rule silently does nothing, which is why it isn't simply accepted either.
+7. **What other lists override is said on the row, only where it's sure:** the same rule, a whole tool, a whole MCP server. Overlapping patterns aren't worked out, so a row can be overridden and not say.
+8. **Secrets stay on the server.** Rule text can hold a token, so each row goes through `maskedRule`: what a tool row masks (`Secrets.maskCommand`, now also on the server as `maskCommandLine`) plus `maskText`. Each secret is a numbered placeholder, `<hidden on the server 1>`, raw JSON's words. Whatever keeps a placeholder keeps the secret; one that rule never gave out, or `•••`, is refused. Move and delete send no text. Search only sees what's shown.
+9. **One writer.** `PUT /v1/agents/settings` with `rule`, through the same open, write, hash check, backup and Undo as any other key, split out as `openForEdit` and `writeEdit`. `jsonListEdit` changes only that element's bytes and compares what comes out. A link is refused and its rules are still shown; `file_changed`, read-only and the rest are as for any key. There's one Undo for the file, and a rule's is offered only on this screen.
+10. **Codex has no such lists, and its screen says so.** Measured on 0.164.0: `approval_policy` and `sandbox_mode` are on its settings, and `~/.codex/rules/*.rules` holds Starlark, `prefix_rule(pattern=[...], decision="allow" | "prompt" | "forbidden")`, which `codex execpolicy check` reads. Those are programs, so an edit would mean parsing a language, and their text can't be masked with any confidence. Only how many files there are is read. `default.rules` is in its binary; a running Codex reading that folder wasn't watched, as a turn needs an account.
 
 ## One starting mode, the agent's own (owner, 2026-11-04)
 

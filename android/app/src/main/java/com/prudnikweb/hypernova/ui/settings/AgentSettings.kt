@@ -75,7 +75,7 @@ import kotlinx.coroutines.launch
  * answers for itself, so this is the hub whose card was tapped, and nothing here changes several at once.
  */
 @Composable
-fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}) {
+fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -> Unit = {}, onPlugins: () -> Unit = {}, onSkills: () -> Unit = {}, onEnv: () -> Unit = {}, onJson: () -> Unit = {}, onRules: () -> Unit = {}) {
     val bottom = screenBottom()
     val codex = agent == AgentSettingsReply.CODEX
     val server = hub.mac.name
@@ -236,8 +236,17 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                     }
                     if (file.state == AgentSettingsFile.OK) {
                         item(key = "summary-seam") { Seam(stringResource(R.string.as_summary), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 14.dp, bottom = 2.dp)) }
-                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s) } }
-                        file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s) } }
+                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s, onRules) } }
+                        file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s, onRules) } }
+                    } else {
+                        // With no file there's no summary, and adding a rule is how the file gets made. A broken one's screen says what's wrong.
+                        item(key = "rules") {
+                            GlassCard(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                                    NavRow(stringResource(R.string.as_rules), if (codex) stringResource(R.string.pr_row_codex) else null, onClick = onRules)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -463,11 +472,11 @@ private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, name: String?
 
 /** What no row above manages. MCP servers, plugins and skills each have their own row, so their names aren't listed again here. */
 @Composable
-private fun ClaudeSummaryCard(s: ClaudeSettingsSummary) {
+private fun ClaudeSummaryCard(s: ClaudeSettingsSummary, onRules: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             val count = { n: Int? -> n?.toString() ?: "?" }
-            ReadOnlyRow(stringResource(R.string.as_rules), stringResource(R.string.as_rules_value, count(s.allow), count(s.ask), count(s.deny)), HN.ink, stringResource(R.string.as_rules_body))
+            NavRow(stringResource(R.string.as_rules), stringResource(R.string.as_rules_value, count(s.allow), count(s.ask), count(s.deny)), onClick = onRules)
             Hairline(Modifier.fillMaxWidth())
             NamesRow(stringResource(R.string.as_hooks), s.hookEvents, stringResource(R.string.as_hooks_body))
             Hidden(s.hiddenHooks)
@@ -476,7 +485,7 @@ private fun ClaudeSummaryCard(s: ClaudeSettingsSummary) {
 }
 
 @Composable
-private fun CodexSummaryCard(s: CodexSettingsSummary) {
+private fun CodexSummaryCard(s: CodexSettingsSummary, onRules: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             ReadOnlyRow(
@@ -485,6 +494,8 @@ private fun CodexSummaryCard(s: CodexSettingsSummary) {
                 if (s.projects == null) HN.amber else HN.ink,
                 stringResource(R.string.as_projects_body),
             )
+            Hairline(Modifier.fillMaxWidth())
+            NavRow(stringResource(R.string.as_rules), stringResource(R.string.pr_row_codex), onClick = onRules)
         }
     }
 }

@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "agent": "claude",
+  "key": "permissions.rules",
+  "hash": "file-hash",
+  "loosened": true
+}

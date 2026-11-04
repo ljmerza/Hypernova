@@ -51,6 +51,7 @@ import { startMode } from './start-modes.ts'
 import { ResumeError, continueText, setAutoContinue, setLoginContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
+import { changeRule, isRuleChange } from './agent-rules.ts'
 import { rulesInEffect } from './permission-rules.ts'
 import { allowSeveral, sessionAllowedTools, sessionAlwaysRules } from './hub.ts'
 import { AlwaysError, readAlwaysChoice, type AlwaysChoice } from './always.ts'
@@ -664,7 +665,9 @@ async function api(c: Ctx): Promise<void> {
   }
   if (path === '/v1/agents/settings' && m === 'PUT') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can change these.')
-    const r = await changeSetting(await readJsonBody(req), settingsModels)
+    const b = await readJsonBody(req)
+    // One of the permission rules, or one key of the fixed list: the same file, the same writer.
+    const r = isRuleChange(b) ? changeRule(b) : await changeSetting(b, settingsModels)
     if (r.changed) afterSettingChange(r.agent, r.key)
     return json(res, 200, r)
   }
@@ -681,7 +684,7 @@ async function api(c: Ctx): Promise<void> {
     if (await versionRoute(path, m, url, res, json, deps)) return dbg('plugin', 'route', { method: m, route: path, agent: url.searchParams.get('agent'), status: res.statusCode })
   }
   // An agent's MCP servers, to see and manage (mcp-routes.ts), for a paired phone.
-  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills' || path === '/v1/agents/env' || path.startsWith('/v1/agents/env/') || path === '/v1/agents/raw' || path === '/v1/agents/raw/undo') {
+  if (path === '/v1/agents/mcp' || path.startsWith('/v1/agents/mcp/') || path === '/v1/agents/plugins' || path.startsWith('/v1/agents/plugins/') || path === '/v1/agents/skills' || path === '/v1/agents/env' || path.startsWith('/v1/agents/env/') || path === '/v1/agents/raw' || path === '/v1/agents/raw/undo' || path === '/v1/agents/rules') {
     if (!c.deviceId) throw new HttpError(401, 'unauthorized', 'Only a paired phone can read these.')
     const deps = {
       folders: () => [...listProjects().map((p) => p.path), ...listSessions().flatMap((s) => (s.cwd ? [s.cwd] : []))],

@@ -878,6 +878,15 @@ function looksRandom(run: string): boolean {
  * <token>". The widget masks the same (WidgetModel.kt, Secrets).
  */
 export function maskSecrets(s: string): string {
+  return masked(s, false)
+}
+
+/** [s] masked as a command line (Secrets.maskCommand): there a key's value is a key, so any value goes but a shell variable (`$TOKEN`, `$(cat key)`), which shows nothing. */
+export function maskCommandLine(s: string): string {
+  return masked(s, true)
+}
+
+function masked(s: string, command: boolean): string {
   let out = s
   for (const re of SECRETS) out = out.replace(re, '•••')
   out = out.replace(USERINFO, '://•••@')
@@ -888,7 +897,8 @@ export function maskSecrets(s: string): string {
     const core = value.slice(0, n)
     // A count of tokens isn't one ("tokens: 12,345,678"): titles about usage stay readable.
     if (!scheme && !bare && TOKENS_NAME.test(keep) && COUNT.test(core)) return m
-    return credential(core, bare ? 'bare' : scheme ? 'scheme' : 'name') ? `${keep}•••${value.slice(n)}` : m
+    const hide = credential(core, bare ? 'bare' : scheme ? 'scheme' : 'name') || (command && !bare && core.length > 0 && core[0] !== '$')
+    return hide ? `${keep}•••${value.slice(n)}` : m
   })
   return out.replace(LONG_RUN, (run) => (looksRandom(run) ? '•••' : run))
 }

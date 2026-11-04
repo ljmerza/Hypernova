@@ -1,0 +1,7 @@
+{
+  "status": 400,
+  "error": {
+    "code": "bad_rule",
+    "message": "Rules are written Tool or Tool(content), and have to end at the closing \")\"."
+  }
+}

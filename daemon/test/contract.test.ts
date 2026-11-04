@@ -1481,6 +1481,27 @@ esac
         contract('rest-raw-undone', { ...(await ok(post('/v1/agents/raw/undo', { agent: 'claude' }))), hash: 'file-hash' })
         writeFileSync(claudeFile, before)
       }
+      // Permission rules: the lists, a secret kept back, each answer of a change.
+      {
+        const before = readFileSync(claudeFile, 'utf8')
+        writeFileSync(claudeFile, JSON.stringify({ permissions: { allow: ['Bash(npm run test:*)', 'Bash', 'Bash(curl -H "Authorization: Bearer never-sent" *)', 'Read', 'Bash('], ask: ['Read'], deny: ['Read(~/.ssh/**)'] } }, null, 2) + '\n')
+        const rules = await ok(get('/v1/agents/rules?agent=claude'))
+        assert.ok(!JSON.stringify(rules).includes('never-sent'))
+        contract('rest-rules', stable({ ...rules, hash: 'file-hash' }))
+        contract('rest-rules-codex', await ok(get('/v1/agents/rules?agent=codex')))
+        const change = (rule: object, more: object = {}) => put({ agent: 'claude', rule, expected: rules.hash, ...more })
+        contract('rest-rules-confirm', await refused(change({ op: 'add', list: 'allow', text: 'Bash(*)' }), 403))
+        contract('rest-rules-bad', await refused(change({ op: 'add', list: 'deny', text: 'Bash(' }), 400))
+        contract('rest-rules-stale', await refused(put({ agent: 'claude', rule: { op: 'delete', list: 'allow', index: 0 }, expected: 'old' }), 409))
+        contract('rest-rules-placeholder', await refused(change({ op: 'add', list: 'deny', text: 'Bash(x <hidden on the server 1>)' }), 400))
+        const done = await ok(change({ op: 'move', list: 'allow', index: 0, to: 'deny' }))
+        contract('rest-rules-changed', { ...done, hash: 'file-hash' })
+        const offered = (await ok(get('/v1/agents/rules?agent=claude'))).undo
+        contract('rest-rules-undo-offer', offered)
+        contract('rest-rules-undo-confirm', await refused(post('/v1/agents/settings/undo', { agent: 'claude', expected: done.hash }), 403))
+        contract('rest-rules-undone', { ...(await ok(post('/v1/agents/settings/undo', { agent: 'claude', expected: done.hash, confirmed: true }))), hash: 'file-hash' })
+        writeFileSync(claudeFile, before)
+      }
       const usual = process.env.HYPERNOVA_CODEX
       process.env.HYPERNOVA_CODEX = fakeCodexBin(join(scratch, 'old-codex'), '0.39.0')
       contract('rest-codex-too-old', asServer(await refused(get('/v1/agents/mcp?agent=codex'), 409)))

@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "agent": "claude",
+  "key": "permissions.rules",
+  "value": null,
+  "changed": true,
+  "hash": "file-hash",
+  "loosened": false
+}

@@ -1,0 +1,7 @@
+{
+  "status": 403,
+  "error": {
+    "code": "confirm_needed",
+    "message": "Bash(*) goes on Allow. Claude Code can run any command without asking. That’s close to Bypass."
+  }
+}

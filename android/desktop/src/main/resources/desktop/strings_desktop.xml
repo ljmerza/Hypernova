@@ -43,6 +43,11 @@
     <string name="desk_always_session">%1$s, for this session</string>
     <string name="desk_always_project">%1$s, in this project</string>
     <string name="desk_always_everywhere">%1$s, everywhere</string>
+    <string name="desk_rules_row">What Claude Code may do without asking on %1$s, to see and change.</string>
+    <string name="desk_rules_for_claude">Claude Code</string>
+    <string name="desk_rules_for_codex">Codex</string>
+    <string name="desk_rules_claude">Claude Code\'s permission rules on %1$s</string>
+    <string name="desk_rules_codex">Codex on %1$s</string>
     <string name="desk_new_defaults">It starts on the default model and effort. To choose others, start it on your phone.</string>
     <string name="desk_more_asks">%1$d more waiting after this one.</string>
     <string name="desk_zoom">Zoom %1$d%%</string>

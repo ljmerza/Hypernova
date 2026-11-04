@@ -58,6 +58,7 @@ import com.prudnikweb.hypernova.data.DebugSendState
 import com.prudnikweb.hypernova.desktop.DesktopPlatform
 import com.prudnikweb.hypernova.desktop.DesktopStrings
 import com.prudnikweb.hypernova.desktop.DesktopTokens
+import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.desktop.FileWhy
 import com.prudnikweb.hypernova.desktop.KeyPlace
 import com.prudnikweb.hypernova.desktop.Shell
@@ -99,6 +100,27 @@ fun SettingsScreen(shell: Shell) {
             Seam(Ui.st_top_bar.text())
             Spacer(Modifier.height(8.dp))
             TopBarSection()
+            Core.live?.let { hub ->
+                Spacer(Modifier.height(16.dp))
+                RulesRow(shell, hub.mac.name)
+            }
+        }
+    }
+}
+
+/** The way to each agent's Permission rules on the server on screen: all the phone's screen does, drawn by the same parts. */
+@Composable
+private fun RulesRow(shell: Shell, server: String) {
+    Seam(Ui.as_rules.text())
+    Spacer(Modifier.height(10.dp))
+    GlassCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp)) {
+            HText(Ui.desk_rules_row.format(server), style = Type.small)
+            Spacer(Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Pill(Ui.desk_rules_for_claude.text(), { shell.rulesAgent = AgentSettingsReply.CLAUDE }, kind = PillKind.Outline, height = 36.dp)
+                Pill(Ui.desk_rules_for_codex.text(), { shell.rulesAgent = AgentSettingsReply.CODEX }, kind = PillKind.Ghost, height = 36.dp)
+            }
         }
     }
 }

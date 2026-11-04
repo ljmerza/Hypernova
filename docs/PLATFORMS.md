@@ -73,6 +73,7 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 | `ui.fx` | `Ambient.kt` (the one clock), `Pace.kt`, `Countdown.kt` |
 | `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
 | `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
+| `ui.settings` | `AgentRulesParts.kt` (an agent's permission rules, as items for a shell's own list, asking through `RulesHost`) |
 | `ui.stats` | Statistics: `StatsBody.kt` (the widths, the states, the range switch), `StatsHero.kt`, `StatsDays.kt`, `StatsLists.kt`. Its sums are `:shared`'s (`StatsBoard`, `DayChart`, `StatWords`), and each app gives it a place: `app/.../ui/stats/StatsPage.kt`, `desktop/.../ui/StatsPane.kt` |
 | `ui.components` | The kit: `Primitives.kt` (`Seam`, `Planet`, `GlassCard`, `Pill`, `StatusChip`, `ConnectionChip`), `Fields.kt`, `Icons.kt`, `Marks.kt`, `FitRow.kt`, `SessionMeta.kt`, `Thinking.kt`, `Rows.kt` (`FieldLabel`, `ToggleRow`, `NavRow`, `InfoRow`, `ConfirmDialog`, `Segmented`), `Popups.kt` (`GlassDialog`, `GlassSheet`), `AgentWords.kt`. The phone's own `ui/components` (dialogs, the blur, the scaffold) shares the package name, so its screens' imports stayed |
 | `ui.chat` | `Transcript.kt` (every kind of row and the approval card), `MarkdownTable.kt`, `Linked.kt`, `LinkAsk.kt` (where a link goes, and the question), `QuestionSteps.kt`, `ToolRuns.kt`, `ToolRunRow.kt`, `AskStack.kt`, `ChatTimeLabel.kt`, `ChatFollow.kt` (following the tail, Show earlier) |
@@ -272,6 +273,7 @@ The owner, 2026-11-03: "let's keep working on the desktop version to have parity
 | Agents boards, an agent's own screen | Not yet | Only a count in the pane |
 | Settings: debug logging | There | The desktop's only part of the phone's Settings |
 | Settings: where the key and tokens are, alerts | Desktop only | |
+| Settings: an agent's permission rules | Partly | The phone's own parts (`sharedui`'s `ui/settings/AgentRulesParts.kt`), from Settings on the server on screen, and written to do all the phone does (docs/DECISIONS.md, "Permission rules, edited"). Not settled: `RulesScreenTest` sometimes stays on Loading after the server has been asked, not yet explained, and it hasn't run against a real server |
 | Settings: providers, account and sign-in, agents' settings, MCP, plugins, skills, environment, versions | Not yet | |
 | Settings: notifications per group, Read aloud, top bar, typing, display, the server's switches (auto-update, debug, Browse outside projects, Stay awake), checklist, connection log | Not yet | |
 

@@ -58,7 +58,9 @@ fun App(shell: Shell, reduced: Boolean = false) {
             // The debug log's line for each screen, as on a phone.
             val screen = if (shell.settings) "settings" else if (pairing) "pairing" else "sessions"
             LaunchedEffect(screen) { DebugLog.i("screen") { screen } }
-            if (shell.settings) SettingsScreen(shell)
+            val rules = shell.rulesAgent
+            if (shell.settings && rules != null && hub != null) RulesScreen(hub, rules, shell)
+            else if (shell.settings) SettingsScreen(shell)
             else if (hub == null || shell.adding) PairScreen(shell, canCancel = hub != null)
             else SessionsScreen(hub, Core.statuses, shell)
             // Above the bottom's message box, so it doesn't cover what's being typed.

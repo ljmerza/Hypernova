@@ -51,6 +51,8 @@ class Shell(private val platform: Platform, var desk: DeskActions = RealDesk) {
     var adding by mutableStateOf(false)
     /** The Settings screen is up: it goes over whatever was there, and goes back to it. */
     var settings by mutableStateOf(false)
+    /** Whose permission rules are open from Settings, or null. */
+    var rulesAgent by mutableStateOf<String?>(null)
     var pair by mutableStateOf<PairState>(PairState.Idle)
         private set
     /** What's typed or pasted in the pairing field. */

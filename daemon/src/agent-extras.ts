@@ -11,6 +11,7 @@ import type { ServerResponse } from 'node:http'
 import { isTable } from './agent-settings.ts'
 import { claudeEnv, claudeRemove, claudeSet, claudeUndo, claudeUndoOffer, codexEnv, codexRemove, codexSet, codexUndo } from './agent-env.ts'
 import { rawRead, rawSave, rawUndo } from './agent-raw.ts'
+import { rulesReply } from './agent-rules.ts'
 import { cliWords, McpRefused, runCli, serial } from './mcp-edit.ts'
 import { codexBin, withAppServer } from './mcp-codex.ts'
 import { askProcess } from './mcp-probe.ts'
@@ -477,6 +478,10 @@ export async function extrasRoute(path: string, m: string, url: URL, res: Server
     const out = path === '/v1/agents/raw' ? await rawSave(b, await folderPath(typeof b.folder === 'string' ? b.folder : null, deps)) : await rawUndo(b)
     deps.changed('claude')
     json(res, 200, out)
+    return true
+  }
+  if (path === '/v1/agents/rules' && m === 'GET') {
+    json(res, 200, await rulesReply(agentOf(param(url, 'agent'))))
     return true
   }
   if (path === '/v1/agents/env' && m === 'GET') {
