@@ -55,6 +55,7 @@ import com.prudnikweb.hypernova.data.rawSave
 import com.prudnikweb.hypernova.data.rawUndo
 import com.prudnikweb.hypernova.ui.LocalConfirm
 import com.prudnikweb.hypernova.ui.LocalToast
+import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
 import com.prudnikweb.hypernova.ui.components.AskBeforeTabs
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.Glyph

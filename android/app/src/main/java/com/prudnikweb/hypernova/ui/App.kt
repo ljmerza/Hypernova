@@ -111,6 +111,8 @@ class Opener(
     val settings: (key: String) -> Unit = {},
     /** Signing Claude Code in, over whatever is open (ui/home/SignInSheet.kt): a /login, or Sign in here. */
     val signIn: () -> Unit = {},
+    /** An agent's MCP servers in Settings, over whatever is open: where they're added and removed. */
+    val mcpServers: (agent: String) -> Unit = {},
 )
 
 val LocalOpener = staticCompositionLocalOf<Opener> { error("No Opener") }
@@ -302,6 +304,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
             },
             automation = { nav.push(Route.AutomationEdit(it)) },
             connectionLog = { nav.push(Route.ConnectionLog) },
+            mcpServers = { nav.push(Route.McpServers(it)) },
             settings = { key ->
                 // The server on screen as it's asked (a session's own, opened from "All servers"), before Home brings the one picked back.
                 val server = com.prudnikweb.hypernova.data.Core.activeId

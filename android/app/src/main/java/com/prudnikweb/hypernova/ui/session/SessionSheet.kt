@@ -181,6 +181,7 @@ internal fun SessionSheet(
                         SheetSeam(stringResource(R.string.session_sheet_agents), trail = if (atWork > 0) stringResource(R.string.agents_running, atWork).uppercase() else null)
                         AgentsPart(agents, atWork, onOpen = { id -> onDismiss(); opener.agent(session.id, id) })
                     }
+                    SheetTab.Mcp -> McpTab(hub, session, onDismiss)
                     SheetTab.Commands -> CommandsTab(hub, session, onDismiss, onModel)
                     SheetTab.Session -> {
                         // How it's going, then what it changed (SessionInfo.kt), before where it runs.
@@ -213,7 +214,7 @@ private val TAB_MIN_HEIGHT = 320.dp
 
 /** A part's seam, as the automation editor's blocks have them. */
 @Composable
-private fun SheetSeam(label: String, trail: String? = null) {
+internal fun SheetSeam(label: String, trail: String? = null) {
     Seam(label, Modifier.padding(top = 18.dp, bottom = 10.dp), trail = trail)
 }
 
@@ -544,7 +545,7 @@ private fun OutdatedNotice(v: OutdatedClaude) {
 
 /** A way somewhere from the sheet, as the model's line: its words, a quiet [trail], a chevron. */
 @Composable
-private fun SheetLink(text: String, trail: String?, onClick: () -> Unit, dim: Boolean = false) {
+internal fun SheetLink(text: String, trail: String?, onClick: () -> Unit, dim: Boolean = false) {
     Row(
         Modifier
             .fillMaxWidth()

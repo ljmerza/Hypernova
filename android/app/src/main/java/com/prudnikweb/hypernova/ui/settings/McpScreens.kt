@@ -86,6 +86,14 @@ import com.prudnikweb.hypernova.data.mcpList
 import com.prudnikweb.hypernova.data.mcpLive
 import com.prudnikweb.hypernova.data.mcpServer
 import com.prudnikweb.hypernova.data.mcpTools
+import com.prudnikweb.hypernova.ui.mcp.McpAnnotationLines
+import com.prudnikweb.hypernova.ui.mcp.McpLiveToolSheet
+import com.prudnikweb.hypernova.ui.mcp.McpLoginSheet
+import com.prudnikweb.hypernova.ui.mcp.McpToolRow
+import com.prudnikweb.hypernova.ui.mcp.mcpStatusColor
+import com.prudnikweb.hypernova.ui.mcp.mcpScopeWord
+import com.prudnikweb.hypernova.ui.mcp.mcpStatusWord
+import com.prudnikweb.hypernova.ui.mcp.mcpToolMark
 import com.prudnikweb.hypernova.ui.components.GlassCard
 import com.prudnikweb.hypernova.ui.components.GlassSheet
 import com.prudnikweb.hypernova.ui.components.Glyph
@@ -103,38 +111,6 @@ import com.prudnikweb.hypernova.ui.theme.Type
 
 @Composable
 private fun seamMod() = Modifier.padding(horizontal = 4.dp).padding(top = 8.dp, bottom = 2.dp)
-
-/** The status's word and colour. Null: not asked yet, or it isn't in the answer. */
-@StringRes
-internal fun mcpStatusWord(status: String?): Int = when (status) {
-    Mcp.CONNECTED -> R.string.mcp_s_connected
-    Mcp.FAILED -> R.string.mcp_s_failed
-    Mcp.NEEDS_AUTH -> R.string.mcp_s_needs_auth
-    Mcp.PENDING -> R.string.mcp_s_pending
-    Mcp.DISABLED -> R.string.mcp_s_disabled
-    Mcp.WAITING -> R.string.mcp_s_waiting
-    Mcp.REJECTED -> R.string.mcp_s_rejected
-    else -> R.string.mcp_s_unknown
-}
-
-@Composable
-private fun statusColor(status: String?): Color = when (status) {
-    Mcp.CONNECTED -> HN.accent
-    Mcp.FAILED, Mcp.NEEDS_AUTH, Mcp.WAITING -> HN.amber
-    else -> HN.inkDim
-}
-
-@StringRes
-internal fun mcpScopeWord(scope: String): Int = when (scope) {
-    Mcp.USER -> R.string.mcp_scope_user
-    Mcp.LOCAL -> R.string.mcp_scope_local
-    Mcp.PROJECT -> R.string.mcp_scope_project
-    Mcp.SETTINGS -> R.string.mcp_scope_settings
-    Mcp.PLUGIN -> R.string.mcp_scope_plugin
-    "managed", "enterprise" -> R.string.mcp_scope_managed
-    "claudeai" -> R.string.mcp_scope_claudeai
-    else -> R.string.mcp_scope_plugin
-}
 
 /** Agents & providers › an agent's settings › MCP servers: every scope, each to tap, with its status from the folder chosen. */
 @Composable
@@ -327,7 +303,7 @@ private fun McpServerRow(name: String, scope: String, how: String, status: Strin
             HText(under, style = Type.monoSmall, color = HN.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(12.dp))
-        HText(stringResource(mcpStatusWord(status)), style = Type.monoSmall, color = statusColor(status), maxLines = 1)
+        HText(stringResource(mcpStatusWord(status)), style = Type.monoSmall, color = mcpStatusColor(status), maxLines = 1)
         Spacer(Modifier.width(8.dp))
         Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
     }
@@ -459,7 +435,7 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
         }
     }
     login?.let { l ->
-        LoginSheet(
+        McpLoginSheet(
             l,
             onCancel = {
                 login = null
@@ -475,7 +451,7 @@ fun McpServerScreen(hub: Hub, agent: String, name: String, scope: String, folder
         )
     }
     tool?.let { t -> ToolSheet(t) { tool = null } }
-    liveTool?.let { t -> LiveToolSheet(t) { liveTool = null } }
+    liveTool?.let { t -> McpLiveToolSheet(t, stringResource(R.string.mcp_why_names)) { liveTool = null } }
 }
 
 @Composable
@@ -518,7 +494,7 @@ private fun StatusCard(live: Result<McpLiveReply>?, mine: McpLive?) {
                 live == null -> LoadingLine(stringResource(R.string.mcp_status_checking))
                 live.isFailure -> HText(live.exceptionOrNull()?.message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.mcp_status_err), style = Type.small, color = HN.amber)
                 else -> {
-                    HText(stringResource(mcpStatusWord(mine?.status)), style = Type.body, color = statusColor(mine?.status))
+                    HText(stringResource(mcpStatusWord(mine?.status)), style = Type.body, color = mcpStatusColor(mine?.status))
                     mine?.serverName?.let { n -> HText(listOfNotNull(n, mine.version).joinToString(" "), style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
                     mine?.error?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 4.dp)) }
                 }
@@ -583,7 +559,7 @@ private fun ToolsCard(facts: Result<McpFacts>?, mine: McpLive?, onTool: (McpTool
                 f != null && f.tools.isNotEmpty() -> {
                     f.tools.forEachIndexed { i, t ->
                         if (i > 0) Hairline(Modifier.fillMaxWidth())
-                        ToolRow(t.name, t.description, toolMarks(t.readOnly, t.destructive)) { onTool(t) }
+                        McpToolRow(t.name, t.description, mcpToolMark(t.readOnly, t.destructive)) { onTool(t) }
                     }
                     if (f.moreTools > 0) HText(pluralStringResource(R.plurals.mcp_more_tools, f.moreTools, f.moreTools), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(vertical = 8.dp))
                 }
@@ -591,7 +567,7 @@ private fun ToolsCard(facts: Result<McpFacts>?, mine: McpLive?, onTool: (McpTool
                     val names = mine?.tools.orEmpty()
                     names.forEachIndexed { i, t ->
                         if (i > 0) Hairline(Modifier.fillMaxWidth())
-                        ToolRow(t.name, null, toolMarks(t.readOnly.takeIf { it }, t.destructive.takeIf { it })) { onLive(t) }
+                        McpToolRow(t.name, null, mcpToolMark(t.readOnly.takeIf { it }, t.destructive.takeIf { it })) { onLive(t) }
                     }
                     // Claude Code's sign-in is its own, so a connected server can still say no to the daemon.
                     val why = if (f?.whyNot == "needs_auth" && mine?.status == Mcp.CONNECTED) "no_direct" else f?.whyNot
@@ -600,38 +576,6 @@ private fun ToolsCard(facts: Result<McpFacts>?, mine: McpLive?, onTool: (McpTool
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun toolMarks(readOnly: Boolean?, destructive: Boolean?): String? = when {
-    destructive == true -> stringResource(R.string.mcp_a_destructive)
-    readOnly == true -> stringResource(R.string.mcp_a_read_only)
-    else -> null
-}
-
-@Composable
-private fun ToolRow(name: String, description: String?, mark: String?, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(remember { MutableInteractionSource() }, indication = null, role = Role.Button, onClick = onClick)
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            HText(name, style = Type.monoSmall, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            description?.let {
-                Spacer(Modifier.height(2.dp))
-                HText(it, style = Type.small, color = HN.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        mark?.let {
-            Spacer(Modifier.width(10.dp))
-            HText(it, style = Type.small, color = HN.inkDim, maxLines = 1)
-        }
-        Spacer(Modifier.width(8.dp))
-        Icon(Glyph.Chevron, size = 12.dp, color = HN.inkDim)
     }
 }
 
@@ -658,22 +602,6 @@ private fun ThingsCard(things: List<McpThing>) {
     }
 }
 
-/** What each hint says, for a flag the server gave. Its own claim: nothing checks it. */
-@Composable
-private fun AnnotationLines(readOnly: Boolean?, destructive: Boolean?, idempotent: Boolean?, openWorld: Boolean?) {
-    val lines = listOfNotNull(
-        readOnly?.let { stringResource(if (it) R.string.mcp_h_read_only else R.string.mcp_h_writes) },
-        destructive?.let { stringResource(if (it) R.string.mcp_h_destructive else R.string.mcp_h_not_destructive) },
-        idempotent?.let { stringResource(if (it) R.string.mcp_h_idempotent else R.string.mcp_h_not_idempotent) },
-        openWorld?.let { stringResource(if (it) R.string.mcp_h_open else R.string.mcp_h_closed) },
-    )
-    if (lines.isEmpty()) return
-    Spacer(Modifier.height(12.dp))
-    HText(stringResource(R.string.mcp_tool_says).uppercase(), style = Type.label, color = HN.inkDim)
-    Spacer(Modifier.height(4.dp))
-    lines.forEach { HText(it, style = Type.small, color = HN.inkMuted, modifier = Modifier.padding(vertical = 1.dp)) }
-}
-
 /** A tool: what it's for, what it says of itself, its parameters. A tool can't be run from here. */
 @Composable
 private fun ToolSheet(t: McpTool, onDismiss: () -> Unit) {
@@ -685,7 +613,7 @@ private fun ToolSheet(t: McpTool, onDismiss: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             HText(it, style = Type.body, color = HN.inkMuted)
         }
-        AnnotationLines(t.readOnly, t.destructive, t.idempotent, t.openWorld)
+        McpAnnotationLines(t.readOnly, t.destructive, t.idempotent, t.openWorld)
         Spacer(Modifier.height(12.dp))
         HText(stringResource(R.string.mcp_params).uppercase(), style = Type.label, color = HN.inkDim)
         if (t.params.isEmpty()) HText(stringResource(R.string.mcp_params_none), style = Type.small, color = HN.inkDim, modifier = Modifier.padding(top = 4.dp))
@@ -707,17 +635,6 @@ private fun ToolSheet(t: McpTool, onDismiss: () -> Unit) {
             Pill(stringResource(if (schema) R.string.mcp_schema_hide else R.string.mcp_schema_show), { schema = !schema }, kind = PillKind.Ghost, height = 40.dp)
             if (schema) HText(text, style = Type.monoSmall, color = HN.inkMuted, modifier = Modifier.padding(top = 6.dp))
         }
-    }
-}
-
-/** All that's known of a tool the server itself couldn't be asked about. */
-@Composable
-private fun LiveToolSheet(t: McpLiveTool, onDismiss: () -> Unit) {
-    GlassSheet(t.name, onDismiss) {
-        HText(t.name, style = Type.title, color = HN.ink)
-        AnnotationLines(t.readOnly.takeIf { it }, t.destructive.takeIf { it }, null, t.openWorld.takeIf { it })
-        Spacer(Modifier.height(8.dp))
-        HText(stringResource(R.string.mcp_why_names), style = Type.small, color = HN.inkDim)
     }
 }
 
@@ -787,41 +704,6 @@ private fun ActionsCard(
         trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 8.dp)) }
         Spacer(Modifier.height(6.dp))
         HText(stringResource(if (codex) R.string.mcp_actions_note_codex else R.string.mcp_actions_note), style = Type.small, color = HN.inkDim)
-    }
-}
-
-/**
- * A sign-in from the phone: the page opens in the browser, which at the end goes to an address on localhost that
- * a phone can't open. That address, pasted here, finishes it on the server.
- */
-@Composable
-private fun LoginSheet(l: McpLogin, onCancel: () -> Unit, onFinish: (String, (String?) -> Unit) -> Unit) {
-    val context = LocalContext.current
-    val toast = LocalToast.current
-    var address by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var trouble by remember { mutableStateOf<String?>(null) }
-    GlassSheet(stringResource(R.string.mcp_sign_in), onCancel) {
-        HText(stringResource(R.string.mcp_sign_in), style = Type.title, color = HN.ink)
-        Spacer(Modifier.height(6.dp))
-        HText(stringResource(R.string.mcp_login_body), style = Type.small, color = HN.inkMuted)
-        Spacer(Modifier.height(10.dp))
-        Pill(stringResource(R.string.mcp_login_open), {
-            // The browser itself: it holds any sign-in the owner already has there.
-            l.url?.let { u -> runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(u))) }.onFailure { toast(context.getString(R.string.about_github_no_browser)) } }
-        }, kind = PillKind.Primary, height = 44.dp)
-        Spacer(Modifier.height(12.dp))
-        Field(address, { address = it }, placeholder = "http://localhost:…", mono = true, singleLine = false, label = stringResource(R.string.mcp_login_address))
-        trouble?.let { HText(it, style = Type.small, color = HN.amber, modifier = Modifier.padding(top = 6.dp)) }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill(stringResource(R.string.mcp_login_finish), {
-                busy = true
-                trouble = null
-                onFinish(address) { err -> trouble = err; busy = false }
-            }, kind = PillKind.Outline, height = 44.dp, enabled = address.isNotBlank() && !busy)
-            Pill(stringResource(R.string.cancel), onCancel, kind = PillKind.Ghost, height = 44.dp)
-        }
     }
 }
 

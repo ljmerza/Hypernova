@@ -59,6 +59,8 @@ class SessionSheetTest {
         rule.onNodeWithText(str(R.string.rules_seam).uppercase(), useUnmergedTree = true).assertExists()
         tab(R.string.session_sheet_agents)
         rule.onNodeWithText(str(R.string.session_sheet_no_agents)).assertExists()
+        tab(R.string.session_sheet_tab_mcp)
+        rule.onNodeWithText(str(R.string.smt_seam).uppercase(), useUnmergedTree = true).assertExists()
         tab(R.string.session_sheet_tab_commands)
         rule.onNodeWithText("/compact", substring = true, useUnmergedTree = true).assertExists()
         rule.snap("sheet_commands")

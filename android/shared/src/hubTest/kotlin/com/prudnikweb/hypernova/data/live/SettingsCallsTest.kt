@@ -7,6 +7,10 @@ import com.prudnikweb.hypernova.data.envRemove
 import com.prudnikweb.hypernova.data.envSet
 import com.prudnikweb.hypernova.data.envUndo
 import com.prudnikweb.hypernova.data.mcpList
+import com.prudnikweb.hypernova.data.SessionMcp
+import com.prudnikweb.hypernova.data.sessionMcpAct
+import com.prudnikweb.hypernova.data.sessionMcpLive
+import com.prudnikweb.hypernova.data.sessionMcpTools
 import com.prudnikweb.hypernova.data.rawFile
 import com.prudnikweb.hypernova.data.rawSave
 import com.prudnikweb.hypernova.data.rawUndo
@@ -103,6 +107,39 @@ class SettingsCallsTest {
         assertEquals("docs", page.name)
         val q = last("GET", "/v1/agents/mcp/server").query!!
         assertTrue(q, q.contains("name=plugin%3Aa%20b") || q.contains("name=plugin%3Aa+b"))
+    }
+
+    // ─── One session's own connections (docs/PROTOCOL.md, "A session's MCP connections") ───
+
+    @Test fun aSessionsOwnConnectionsAreAskedForActedOnAndReadBack() {
+        connect()
+        answer("GET", "/v1/sessions/s1/mcp/live", "rest-session-mcp-live")
+        val live = rig.call { rig.hub.sessionMcpLive("s1") }.getOrThrow()
+        assertEquals(SessionMcp.TERMINAL, live.kind)
+        assertFalse(last("GET", "/v1/sessions/s1/mcp/live").query.orEmpty().contains("fresh"))
+        rig.call { rig.hub.sessionMcpLive("s1", fresh = true) }.getOrThrow()
+        assertTrue(last("GET", "/v1/sessions/s1/mcp/live").query!!.contains("fresh=1"))
+        answer("POST", "/v1/sessions/s1/mcp/live", "rest-session-mcp-acted")
+        val a = rig.call { rig.hub.sessionMcpAct("s1", SessionMcp.RECONNECT, "two words") }.getOrThrow()
+        assertEquals(SessionMcp.DONE, a.outcome)
+        val sent = JSONObject(last("POST", "/v1/sessions/s1/mcp/live").body)
+        assertEquals("reconnect", sent.getString("action"))
+        assertEquals("two words", sent.getString("name"))
+        answer("GET", "/v1/sessions/s1/mcp/live/tools", "rest-session-mcp-tools")
+        assertEquals("tool_00", rig.call { rig.hub.sessionMcpTools("s1", "two words") }.getOrThrow().first().name)
+        val q = last("GET", "/v1/sessions/s1/mcp/live/tools").query!!
+        assertTrue(q, q.contains("name=two%20words") || q.contains("name=two+words"))
+    }
+
+    @Test fun aSessionsOwnConnectionsOnAnOlderServerSayItNeedsUpdatingAndARefusalKeepsItsWords() {
+        connect()
+        daemon.on("GET", "/v1/sessions/old/mcp/live") { refusal(404, "not_found", "Unknown endpoint.") }
+        assertTrue(rig.call { rig.hub.sessionMcpLive("old") }.exceptionOrNull() is AgentSettingsTooOld)
+        answer("POST", "/v1/sessions/s1/mcp/live", "rest-session-mcp-refused", status = 409)
+        val e = rig.call { rig.hub.sessionMcpAct("s1", SessionMcp.RECONNECT, "many") }.exceptionOrNull()
+        assertTrue(e is AgentSettingRefused)
+        assertEquals("waiting", (e as AgentSettingRefused).code)
+        assertTrue(e.message!!.contains("showing something"))
     }
 
     // ─── Updating an agent (docs/PROTOCOL.md, "Updating an agent") ───

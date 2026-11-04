@@ -25,6 +25,8 @@ internal enum class SheetTab(@StringRes val label: Int) {
     Permissions(R.string.session_sheet_permissions),
     /** The agents at work, by workflow. */
     Agents(R.string.session_sheet_agents),
+    /** This session's MCP servers, and what can be done to them (McpTab.kt). */
+    Mcp(R.string.session_sheet_tab_mcp),
     /** A side question (/btw), and Claude Code's commands and the owner's skills (CommandsTab.kt). */
     Commands(R.string.session_sheet_tab_commands),
     /** Its time and git line (SessionInfo.kt), where it runs, and the Home card's menu. */
