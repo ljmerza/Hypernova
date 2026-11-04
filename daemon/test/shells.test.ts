@@ -15,6 +15,10 @@ const scratch = mkdtempSync(join(tmpdir(), 'hypernova-test-'))
 process.env.HYPERNOVA_SUPPORT = join(scratch, 'support')
 process.env.HYPERNOVA_LOGS = join(scratch, 'logs')
 process.env.CLAUDE_CONFIG_DIR = join(scratch, 'claude')
+// A machine that's been up for a day, whatever this one's real uptime. The processes below are real pids given start times
+// from before their commands, which main.jsonl spreads over 6 minutes, and a runner may have booted more recently than that:
+// reboot.ts would then skip them as left from before its boot.
+process.env.HYPERNOVA_BOOTED_AT = String(Date.now() - 24 * 3600_000)
 after(() => rmSync(scratch, { recursive: true, force: true }))
 
 const hub = await import('../src/hub.ts')
