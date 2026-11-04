@@ -91,6 +91,44 @@ Step 2 is below, "The desktop app". `HubViewModel` is still Android's. The drawi
 
 **What the desktop's chat doesn't have yet,** for the parity list: the terminal, the usage strip and the session sheet's tabs, a message's menu (Copy, Quote, Read aloud, Rewind, its exact time), the "/" list, `/btw` and its card, voice, attaching files and their pictures, Always and This session on an ask, a terminal's other menus (`MenuCard`), the status bar and to-do list, a blocked session's card and Continue, the switch line, an agent's own screen, opening a file, previews. What opens one of these from the chat says it's on the phone.
 
+## The rules' checks (2026-11-03)
+
+CLAUDE.md's table of what each module never holds, with a failing check behind it: `.github/workflows/arch-check.yml`, on every push and pull request. A broken rule names the file, the rule and what to do.
+
+```bash
+scripts/arch-check.py                                # every rule below but the list's comparison: about 2 seconds, nothing compiled
+scripts/test-arch-check.py                           # plants each kind of breach in a copy of the sources: about 30 seconds
+scripts/test-arch-check.py --gradle                  # the same for the list's comparison, in a copy of the build files: about a minute
+cd android && ./gradlew :app:checkRuntimeClasspath   # the list against the real build: under a minute, nothing compiled
+cd android && ./gradlew :app:writeRuntimeClasspath   # after a chosen change: commit the lists with it
+```
+
+| Rule | What fails |
+|---|---|
+| `sharedui-common-only` | A source set beside `commonMain` in `sharedui`; `android.*`, `androidx.activity`, `java.awt`, `javax.swing`, `R`, `expect` or `actual` in it |
+| `sharedui-layers` | `ui.theme`, `ui.fx`, `ui.components` or `ui.platform` naming any other `ui` package. Features may name them |
+| `shared-no-ui` | `android.*`, `java.awt`, `javax.swing`, `R`, `ui`, `desktop` or Compose beyond state anywhere in `shared/src`, its tests too. `androidx.compose.runtime`'s state is allowed by name (`SHARED_RUNTIME_STATE`), and `@Composable` only in `FullTextSearch.kt`, which draws nothing |
+| `desktop-no-kit` | A top-level declaration anywhere in `android/desktop`, private or not, named as anything `sharedui` shows the shells. The names come from `sharedui`'s own files |
+| `one-hn` | An `object HN`, or a class of that name, at any depth, outside `sharedui` |
+| `phone-sharedui-same-name`, `desktop-sharedui-same-name` | A top-level composable or class in a shell's `ui/` with the name of one in `sharedui` |
+| `phone-desktop-same-name` | A top-level composable or class in both shells' `ui/`: a copy that never went through `sharedui`. A window's root and anything called `...Screen` don't count, as each system lays those out its own way |
+| `same-file-same-package` | The same file name and `package` in two of `app`, `shared`, `sharedui` and `desktop`, main code only: they clash at dex as the same `XKt`. Tests may: each target's `HubRig.kt` is on purpose |
+| `app-classpath` | `classpath-debug.txt` or `classpath-release.txt` missing from `android/app`, or JetBrains' `foundation` or `animation` in them (`animation-core` stays: Haze brings it). `:app:checkRuntimeClasspath` fails when either list differs from the build's graph, versions included |
+| `previews-ignored` | `.*-preview/` gone from `.gitignore` |
+| `allowlist` | A line in `ALLOWED` that's no longer a breach, or whose row in `docs/LATER.md` doesn't name it |
+
+**The allowlist** is `ALLOWED` at the top of `scripts/arch-check.py`: each known breach by rule, file and name, with a line of why and its row in `docs/LATER.md` (L128, L129). A new breach fails until it has a line and a row. A breach taken away fails until its line goes too, so the list can only shrink on purpose.
+
+**A new string** has no line here: `StringIds.kt`'s `when` has no `else`, so a key in `Str.kt` without its line doesn't compile in `:app`, and `WordsTest` and `StringsTableTest` hold the keys to the phone's text.
+
+**What they can't see:**
+
+- Logic copied under another name, or a part renamed to get past them. `ChatPane.kt` mirroring `SessionScreen` is the case today (LATER L130). This stays review's job.
+- Same-named plain functions and values between the shells and `sharedui`, and members or local functions anywhere. Only `desktop-no-kit` looks at plain functions and values, and only at the top level.
+- Something built in a shell that could be shared. They catch what's forbidden, not what's missing.
+- A name reached without being written: reflection, or a string handed to `Class.forName`. Comments and strings are skipped on purpose.
+- `:desktop`'s classpath, what's inside a jar, or a dependency that changes behaviour at the same version.
+
 ## The desktop app (step 2 of the desktop plan, built 2026-11-02)
 
 `android/desktop`: Compose for Desktop 1.12.1 over `:shared`, a JVM app, Linux first and written to be portable. It pairs by a pasted `hypernova pair` link, lists one server's sessions in the phone's three groups with the chosen session beside them (docs/DECISIONS.md, "The desktop client's two panes"), answers Allow or Deny there, and has History, Rename, Stop, Remove from list, New session, and the session's chat under them: it reads, replies and answers questions and plans (docs/DECISIONS.md, "The chat on the desktop"). What's left of the phone's is in "The parity list" below. A server switcher is there because `Core` already had the rest. The choices and why: docs/DECISIONS.md, "The desktop app". How to run it: docs/DEV-SETUP.md, "The desktop app". Its packages (a `.deb`, a folder, a `.dmg` for each Mac processor and a Windows `.msi`, each with its own Java): docs/RELEASING.md, "The desktop client's packages".
