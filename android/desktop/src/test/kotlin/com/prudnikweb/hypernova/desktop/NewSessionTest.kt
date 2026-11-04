@@ -289,7 +289,7 @@ class NewSessionTest {
         assertEquals("default", sent().getString("permissionMode"))
     }
 
-    // ─── New sessions start in: the server's, per agent, the same value the phone's sheet opens on ───
+    // ─── What it opens on: the agent's own setting on that server, the same value the phone's sheet opens on ───
 
     private fun keeps(claude: String?, codex: String?) {
         d.snapshot = world {
@@ -327,6 +327,22 @@ class NewSessionTest {
         press(Ui.start.text())
         until("it started") { d.count("POST", "/v1/sessions") == 1 }
         assertEquals(AgentKind.READ_ONLY, sent().getString("permissionMode"))
+    }
+
+    /** The file changed, by a row on the phone or by hand: the server says so, and the form that's up follows. */
+    @Test fun itFollowsAChangeHeardFromTheServer() = runDesktopComposeUiTest(1200, 900) {
+        keeps("plan", AgentKind.READ_ONLY)
+        up()
+        open()
+        inPane(Ui.mode_title_plan.text()).assertIsSelected()
+        d.push(FakeDaemon.msg("claude") { put("claude", JSONObject().put("available", true).put("startMode", "acceptEdits")) })
+        waitUntil(timeoutMillis = 5_000) { Core.live?.claude?.startMode == "acceptEdits" }
+        waitForIdle()
+        inPane(Ui.mode_title_accept.text()).assertIsSelected()
+        write("Go")
+        press(Ui.start.text())
+        until("it started") { d.count("POST", "/v1/sessions") == 1 }
+        assertEquals("acceptEdits", sent().getString("permissionMode"))
     }
 
     @Test fun anOlderServerOpensOnWhatWasHere() = runDesktopComposeUiTest(1200, 900) {

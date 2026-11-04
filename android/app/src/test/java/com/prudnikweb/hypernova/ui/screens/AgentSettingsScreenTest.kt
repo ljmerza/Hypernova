@@ -110,7 +110,8 @@ class AgentSettingsScreenTest {
             plugins = listOf(PluginSetting("formatter", true), PluginSetting("linter", false)),
             mcpServers = listOf("home-assistant"),
             hookEvents = listOf("Stop", "PreToolUse"),
-            hidden = 1,
+            hidden = 5,
+            hiddenHooks = 1,
         ),
         null,
         hash = "hash-claude",
@@ -152,7 +153,7 @@ class AgentSettingsScreenTest {
             set("personality", "none"),
         ),
         null,
-        CodexSettingsSummary(projects = 7, mcpServers = emptyList(), hidden = 0),
+        CodexSettingsSummary(projects = 7, mcpServers = listOf("fetch-server"), hidden = 2),
         hash = "hash-codex",
         editable = listOf(
             EditableSetting("model_reasoning_effort", listOf("low", "high").map { SettingChoice(it, null, false, null) }),
@@ -173,7 +174,7 @@ class AgentSettingsScreenTest {
     private fun seen(text: String) = rule.onNodeWithText(text, substring = true).performScrollTo().assertExists()
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun permissionRulesIsARowWithItsCountsThatOpensThemAndTheOldRowIsGone() {
+    @Test fun permissionRulesUnderAlsoInTheFileHasItsCountsAndOpensThem() {
         hub.answer = Result.success(AgentSettingsReply(claude, file(AgentSettingsFile.MISSING)))
         var opened = 0
         rule.setContent { Harness(spy) { AgentSettingsScreen(hub, AgentSettingsReply.CLAUDE, onBack = {}, onRules = { opened++ }) } }
@@ -186,10 +187,26 @@ class AgentSettingsScreenTest {
     }
 
     @Config(qualifiers = "+h1800dp")
-    @Test fun codexsRowSaysItHasNoSuchLists() {
+    @Test fun codexsRowSaysItHasNoSuchListsAndOpensTheScreenThatSaysWhatItHas() {
         hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), codex))
-        open(AgentSettingsReply.CODEX)
+        var opened = 0
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, AgentSettingsReply.CODEX, onBack = {}, onRules = { opened++ }) } }
+        rule.waitForIdle()
         seen(str(R.string.pr_row_codex))
+        rule.onNodeWithText(str(R.string.as_rules)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, opened)
+    }
+
+    @Config(qualifiers = "+h1800dp")
+    @Test fun withNoFileTheRulesStillOpenSinceAddingOneIsHowTheFileGetsMade() {
+        hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), file(AgentSettingsFile.MISSING)))
+        var opened = 0
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, AgentSettingsReply.CLAUDE, onBack = {}, onRules = { opened++ }) } }
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.as_rules)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, opened)
     }
 
     @Config(qualifiers = "+h1800dp")
@@ -207,19 +224,17 @@ class AgentSettingsScreenTest {
         // Not set and unrecognised are each said.
         rule.onAllNodes(androidx.compose.ui.test.hasText(str(R.string.as_not_set), substring = true)).fetchSemanticsNodes().let { assertEquals(3, it.size) }
         seen(str(R.string.as_unrecognised))
-        // The count stays, on the row that opens them.
-        seen(str(R.string.as_rules))
+        // What no row above manages stays: the rules' counts and the hook events, with only what's held back of those.
+        seen(str(R.string.as_summary).uppercase())
         seen(str(R.string.as_rules_value, "12", "1", "3"))
-        seen("formatter: ${str(R.string.as_on)}")
-        seen("linter: ${str(R.string.as_off)}")
-        seen("home-assistant")
-        // The server's own first, then each project's under its name.
-        seen(str(R.string.as_mcp_here))
-        seen(str(R.string.as_mcp_claude_body))
-        seen("db-tools")
-        seen("parser")
+        seen(str(R.string.as_hooks))
         seen("PreToolUse")
-        seen(org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(R.plurals.as_hidden, 3, 3))
+        seen(quantity(R.plurals.as_hidden, 1))
+        // What a row above manages isn't listed again, though the server still sends it for an older app.
+        for (name in listOf("formatter", "linter", "home-assistant", "github", "db-tools", "parser", "search")) rule.onNodeWithText(name, substring = true).assertDoesNotExist()
+        for (more in 2..7) rule.onNodeWithText(quantity(R.plurals.as_hidden, more)).assertDoesNotExist()
+        seen(str(R.string.as_mcp_manage))
+        seen(str(R.string.as_plugins_manage))
         rule.snap("agent_settings_claude")
     }
 
@@ -234,6 +249,10 @@ class AgentSettingsScreenTest {
         seen(str(R.string.as_v_workspace_write))
         seen(str(R.string.as_projects))
         seen("7")
+        // MCP servers have their row above, and Hidden only counted their names.
+        rule.onNodeWithText("fetch-server", substring = true).assertDoesNotExist()
+        rule.onNodeWithText(quantity(R.plurals.as_hidden, 2)).assertDoesNotExist()
+        seen(str(R.string.as_mcp_manage))
         rule.snap("agent_settings_codex")
     }
 
@@ -248,68 +267,48 @@ class AgentSettingsScreenTest {
         rule.onNodeWithText(str(R.string.ag_claude_signed_in_plan, "Max")).assertExists()
     }
 
-    // ─── New sessions start in, this server's, per agent ───
+    // ─── One starting mode: the agent's own (docs/DECISIONS.md, "One starting mode, the agent's own") ───
 
-    private class StartHub(claude: String?, codex: String?) : Hub by FakeHub() {
-        var claudeMode by mutableStateOf(claude)
-        var codexMode by mutableStateOf(codex)
-        val set = mutableListOf<String>()
-        override val claude get() = com.prudnikweb.hypernova.data.ClaudeState(true, "2.1.318", startMode = claudeMode)
-        override val codex get() = com.prudnikweb.hypernova.data.CodexState(available = true, enabled = true, connected = true, startMode = codexMode)
-        override suspend fun agentSettings() = Result.failure<AgentSettingsReply>(IllegalStateException("nope"))
-        override suspend fun setStartMode(agent: String, mode: String): Result<Unit> {
-            set += "$agent $mode"
-            if (agent == AgentSettingsReply.CODEX) codexMode = mode else claudeMode = mode
-            return Result.success(Unit)
-        }
-    }
-    private fun startHere(hub: Hub, agent: String) {
-        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, agent, onBack = {}) } }
-        rule.waitForIdle()
+    /** There's no second row: the file's says what it does everywhere, and what New session makes of a value it won't open on. */
+    @Config(qualifiers = "+h1800dp")
+    @Test fun oneStartingModeRowSaysItsForNewSessionsEverywhere() {
+        claudeOpen()
+        rule.onNodeWithText("New sessions start in", substring = true).assertDoesNotExist()
+        rule.onNode(hasText("NEW SESSIONS")).assertDoesNotExist()
+        val words = str(R.string.as_k_mode_body)
+        seen(words)
+        for (place in listOf("in a terminal", "in this app", "on the desktop client", "New session opens on Ask")) assert(place in words) { place }
     }
 
-    @Config(qualifiers = "+h1500dp")
-    @Test fun claudeCodeOffersItsFourAndNeverBypass() {
-        val hub = StartHub("plan", AgentKind.READ_ONLY)
-        startHere(hub, AgentSettingsReply.CLAUDE)
-        rule.onNodeWithText(str(R.string.st_start_mode)).performScrollTo().assertExists()
-        rule.onNodeWithText(str(R.string.mode_plan)).assertIsSelected()
-        for (m in listOf(R.string.mode_default, R.string.mode_accept, R.string.mode_auto)) rule.onNodeWithText(str(m)).assertExists()
-        rule.onNodeWithText(str(R.string.mode_bypass)).assertDoesNotExist()
-        rule.snap("agent_settings_start_mode_claude")
-        rule.onNodeWithText(str(R.string.mode_accept)).performScrollTo().performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("claude acceptEdits"), hub.set)
-        rule.onNodeWithText(str(R.string.mode_accept)).assertIsSelected()
-        // Auto thinks twice first, and Keep asking keeps what it was.
-        rule.onNodeWithText(str(R.string.mode_auto)).performScrollTo().performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.think_keep)).performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("claude acceptEdits"), hub.set)
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsSandboxRowSaysTheSameAndApprovalsStayFilesOnly() {
+        hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), codex))
+        open(AgentSettingsReply.CODEX)
+        rule.onNode(hasText("NEW SESSIONS")).assertDoesNotExist()
+        val words = str(R.string.as_when_new_threads_everywhere)
+        seen(words)
+        for (place in listOf("in a terminal", "in this app", "on the desktop client", "New session opens on Read only")) assert(place in words) { place }
+        assertEquals(R.string.as_when_new_threads_everywhere, whenWords("sandbox_mode"))
+        assertEquals("a thread from this app still always asks on-request", R.string.as_when_new_threads_unchosen, whenWords("approval_policy"))
     }
 
-    @Test fun codexOffersItsTwoAndNeverFullAccess() {
-        val hub = StartHub("auto", AgentKind.READ_ONLY)
-        startHere(hub, AgentSettingsReply.CODEX)
-        rule.onNodeWithText(str(R.string.cx_mode_read_only)).performScrollTo().assertIsSelected()
-        rule.onNodeWithText(str(R.string.mode_plan)).assertDoesNotExist()
-        rule.snap("agent_settings_start_mode_codex")
-        rule.onNodeWithText(str(R.string.cx_mode_can_edit)).performScrollTo().performClick()
+    /** Can edit on the row loosens a thread's sandbox: it goes through the same check as Auto on Claude Code's, and only then saves. */
+    @Config(qualifiers = "+h1800dp")
+    @Test fun codexsSandboxLooseningAsksFirstAndOnlyThenSaves() {
+        val readOnly = codex.copy(
+            values = codex.values.map { if (it.key == "sandbox_mode") set("sandbox_mode", "read-only") else it },
+            editable = listOf(EditableSetting("sandbox_mode", listOf(SettingChoice("read-only", null, false, null), SettingChoice("workspace-write", null, true, null)))),
+        )
+        hub.answer = Result.success(AgentSettingsReply(file(AgentSettingsFile.MISSING), readOnly))
+        open(AgentSettingsReply.CODEX)
+        row(R.string.as_k_sandbox)
+        choice(R.string.as_v_workspace_write).performClick()
         rule.waitForIdle()
-        assertEquals(listOf("codex workspace-write"), hub.set)
-        assertEquals("Claude Code's stays", "auto", hub.claudeMode)
-    }
-
-    @Test fun aStaleValueShowsTheSafeOne() {
-        startHere(StartHub("bypassPermissions", "danger-full-access"), AgentSettingsReply.CLAUDE)
-        rule.onNodeWithText(str(R.string.mode_default)).assertIsSelected()
-    }
-
-    @Test fun anOlderServerSaysItNeedsUpdatingWithNothingToChoose() {
-        startHere(StartHub(null, null), AgentSettingsReply.CLAUDE)
-        rule.onNodeWithText(str(R.string.st_start_mode_too_old, FakeHub().mac.name)).assertExists()
-        rule.onNodeWithText(str(R.string.mode_plan)).assertDoesNotExist()
+        assertEquals(emptyList<String>(), hub.changes)
+        assertEquals(str(R.string.as_loosen_title, hub.mac.name), spy.confirms.single().title)
+        spy.confirms.single().onConfirm()
+        rule.waitForIdle()
+        assertEquals(listOf("codex sandbox_mode workspace-write hash-codex"), hub.changes)
     }
 
     @Test fun codexAccountSaysItsPlanAndUsage() {
@@ -380,54 +379,29 @@ class AgentSettingsScreenTest {
 
     private fun quantity(id: Int, n: Int) = org.robolectric.RuntimeEnvironment.getApplication().resources.getQuantityString(id, n, n)
 
+    /** With no settings file, MCP servers still have their row: the names aren't repeated in a card of their own. */
     @Config(qualifiers = "+h1500dp")
-    @Test fun mcpServersAreListedEvenWithNoSettingsFile() {
+    @Test fun noSettingsFileStillOffersTheMcpRowAndListsNoNames() {
         val missing = AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, mcp = claude.mcp)
+        var mcp = 0
         hub.answer = Result.success(AgentSettingsReply(missing, codex))
-        open(AgentSettingsReply.CLAUDE)
+        rule.setContent { Harness(spy) { AgentSettingsScreen(hub, AgentSettingsReply.CLAUDE, onBack = {}, onMcp = { mcp++ }) } }
+        rule.waitForIdle()
         seen(str(R.string.as_missing_claude, hub.mac.name))
-        seen(str(R.string.as_mcp_here))
-        seen("home-assistant")
-        seen("parser")
-        seen("docs")
-        seen(quantity(R.plurals.as_hidden, 2))
+        for (name in listOf("home-assistant", "parser", "docs")) rule.onNodeWithText(name, substring = true).assertDoesNotExist()
+        rule.onNodeWithText(quantity(R.plurals.as_hidden, 2)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.as_mcp_manage)).performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(1, mcp)
     }
 
+    /** An older server sends no hook-only count: nothing's said, rather than a total counting names that aren't listed here. */
     @Config(qualifiers = "+h1800dp")
-    @Test fun anOlderServersMcpNamesStillShowAndNothingSaysServersArentListed() {
-        val older = claude.copy(mcp = null)
-        hub.answer = Result.success(AgentSettingsReply(older, codex))
+    @Test fun anOlderServersTotalOfHeldBackNamesIsntSaidHere() {
+        hub.answer = Result.success(AgentSettingsReply(claude.copy(claude = claude.claude!!.copy(hidden = 3, hiddenHooks = 0)), codex))
         open(AgentSettingsReply.CLAUDE)
-        seen("home-assistant")
-        rule.onNodeWithText(str(R.string.as_mcp_here)).assertDoesNotExist()
-        rule.onNodeWithText("claude mcp add", substring = true).assertDoesNotExist()
-    }
-
-    @Config(qualifiers = "+h1500dp")
-    @Test fun longMcpListsAreCappedAndSayHowManyMore() {
-        val own = List(ClaudeMcp.NAMES_SHOWN + 3) { McpName("server$it", "user", null) }
-        val folders = List(ClaudeMcp.GROUPS_SHOWN + 2) { McpName("tool", "project", "p%02d".format(it)) }
-        val m = ClaudeMcp(AgentSettingsFile.OK, own + folders, 0, 4)
-        val (groups, more) = m.groups()
-        assertEquals(ClaudeMcp.GROUPS_SHOWN + 1, groups.size)
-        assertEquals(null, groups[0].project)
-        assertEquals(3, groups[0].more)
-        assertEquals("p00", groups[1].project)
-        assertEquals(2, more)
-        hub.answer = Result.success(AgentSettingsReply(AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, mcp = m), codex))
-        open(AgentSettingsReply.CLAUDE)
-        seen(quantity(R.plurals.as_mcp_more, 3))
-        seen(quantity(R.plurals.as_mcp_more_projects, 2))
-        seen(quantity(R.plurals.as_mcp_not_read, 4))
-        rule.onNodeWithText("server${ClaudeMcp.NAMES_SHOWN}", substring = true).assertDoesNotExist()
-    }
-
-    @Config(qualifiers = "+h1800dp")
-    @Test fun anUnreadableClaudeJsonSaysTheListMayBeShort() {
-        val m = ClaudeMcp(AgentSettingsFile.MALFORMED, emptyList(), 0, 0)
-        hub.answer = Result.success(AgentSettingsReply(claude.copy(mcp = m), codex))
-        open(AgentSettingsReply.CLAUDE)
-        seen(str(R.string.as_mcp_trouble))
+        seen("PreToolUse")
+        rule.onNodeWithText(quantity(R.plurals.as_hidden, 3)).assertDoesNotExist()
     }
 
     @Test fun everyShownKeyHasItsWords() {
@@ -630,12 +604,11 @@ class AgentSettingsScreenTest {
     }
 
     @Config(qualifiers = "+h1500dp")
-    @Test fun aMissingFileKeepsItsStateItsMcpServersAndWhatCanBeSet() {
+    @Test fun aMissingFileKeepsItsStateAndWhatCanBeSet() {
         val missing = AgentSettingsFile(AgentSettingsFile.MISSING, emptyList(), null, null, editable = claude.editable, mcp = claude.mcp)
         hub.answer = Result.success(AgentSettingsReply(missing, file(AgentSettingsFile.MISSING)))
         open(AgentSettingsReply.CLAUDE)
         seen(str(R.string.as_missing_claude, hub.mac.name))
-        seen("home-assistant")
         seen(str(R.string.as_k_mode))
         rule.onNodeWithText(str(R.string.as_summary)).assertDoesNotExist()
     }
@@ -668,8 +641,10 @@ class AgentSettingsScreenTest {
         assertEquals(R.string.as_when_maybe_new_session, whenWords("showThinkingSummaries"))
         assertEquals(R.string.as_when_next_update, whenWords("autoUpdatesChannel"))
         for (k in listOf("model", "model_reasoning_effort", "web_search")) assertEquals(k, R.string.as_when_new_threads, whenWords(k))
-        // A thread from this app names its own sandbox and approvals, so the file reaches only those that do not.
-        for (k in listOf("approval_policy", "sandbox_mode")) assertEquals(k, R.string.as_when_new_threads_unchosen, whenWords(k))
+        // A thread from this app names its own approvals, so the file reaches only those that do not.
+        assertEquals(R.string.as_when_new_threads_unchosen, whenWords("approval_policy"))
+        // And its own sandbox, which a form opens on from the file.
+        assertEquals(R.string.as_when_new_threads_everywhere, whenWords("sandbox_mode"))
         for (k in listOf("effortLevel", "includeCoAuthoredBy", "autoDreamEnabled", "inputNeededNotifEnabled", "agentPushNotifEnabled", "personality")) assertNull(k, whenWords(k))
     }
 

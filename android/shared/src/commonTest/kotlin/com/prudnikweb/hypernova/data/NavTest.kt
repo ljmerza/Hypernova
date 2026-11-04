@@ -78,6 +78,10 @@ class NavTest {
         assertEquals(true, inSettings(listOf(home, Route.ConnectionLog)))
     }
 
+    @Test fun statisticsIsAPageOfSettings() {
+        assertEquals(true, inSettings(listOf(home, Route.Statistics)))
+    }
+
     @Test fun aWebPageIsInSettingsOnlyOverOne() {
         val page = Route.Web("http://127.0.0.1:47322/qa", "Checklist")
         assertEquals(true, inSettings(listOf(home, Route.ServerSettings("z2"), page)))

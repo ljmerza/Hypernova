@@ -96,22 +96,21 @@ fun ThinkTwiceCard(mode: String, incident: Incident, onKeep: () -> Unit, onGoOn:
  * The permission-mode picker, five segments, with the think-twice card in front of Auto and
  * Bypass: tapping either opens the card first and the mode changes only on "Use … anyway". A mode
  * the session is already in changes nothing and asks nothing. Bypass is dimmed when the session
- * can't switch to it, with the reason in one line underneath. Fork: [bypass] false leaves Bypass
- * out, four segments (each agent's settings on a server, "New sessions start in").
+ * can't switch to it, with the reason in one line underneath.
  */
 @Composable
-fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, bypassAvailable: Boolean = true, bypass: Boolean = true) {
+fun ModePicker(mode: String, onChange: (String) -> Unit, modifier: Modifier = Modifier, bypassAvailable: Boolean = true) {
     val context = LocalContext.current
     var asking by rememberSaveable { mutableStateOf<String?>(null) }
     var incidentId by rememberSaveable { mutableStateOf<String?>(null) }
     Column(modifier) {
         Segmented(
-            listOfNotNull(
+            listOf(
                 "default" to stringResource(R.string.mode_default),
                 "acceptEdits" to stringResource(R.string.mode_accept),
                 "plan" to stringResource(R.string.mode_plan),
                 "auto" to stringResource(R.string.mode_auto),
-                ("bypassPermissions" to stringResource(R.string.mode_bypass)).takeIf { bypass },
+                "bypassPermissions" to stringResource(R.string.mode_bypass),
             ),
             mode,
             { m ->

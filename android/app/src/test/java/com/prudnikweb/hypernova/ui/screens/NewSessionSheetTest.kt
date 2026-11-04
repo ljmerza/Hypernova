@@ -121,9 +121,9 @@ class NewSessionSheetTest {
         assertEquals(listOf("new-session"), started)
     }
 
-    // ─── New sessions start in: the server's, per agent ───
+    // ─── What it opens on: the agent's own setting on that server, per agent ───
 
-    private class ServerHub(claude: String?, codex: String?, override val startModeOwed: String? = null) : Hub by FakeHub() {
+    private class ServerHub(claude: String?, codex: String?) : Hub by FakeHub() {
         var claudeMode by mutableStateOf(claude)
         var codexMode by mutableStateOf(codex)
         val requests = mutableListOf<NewSessionRequest>()
@@ -228,19 +228,27 @@ class NewSessionSheetTest {
         assertEquals(AgentKind.READ_ONLY, send(claudeHub).permissionMode)
     }
 
-    @Test fun anOlderServerOwedTheOldSettingOpensOnItAndCodexOnItsLastMode() {
+    /** The daemon falls back already (start-modes.ts): this is an older server's value, or a mistake, and it's the sheet's own check. */
+    @Test fun everyValueThatIsntAModeOpensOnTheSafeOne() {
+        for (m in listOf("dontAsk", "somethingNew", "workspace-write", "")) assertEquals(m, "default", com.prudnikweb.hypernova.data.NewSessionMemory.startsIn(AgentKind.CLAUDE, ServerHub(m, null), com.prudnikweb.hypernova.data.NewSessionMemory.load(context.storage)))
+        for (m in listOf("never", "somethingNew", "plan", "")) assertEquals(m, AgentKind.READ_ONLY, com.prudnikweb.hypernova.data.NewSessionMemory.startsIn(AgentKind.CODEX, ServerHub(null, m), com.prudnikweb.hypernova.data.NewSessionMemory.load(context.storage)))
+    }
+
+    /** A server older than v0.27.0 says nothing: Ask, and Codex's last mode here. */
+    @Test fun anOlderServerOpensOnAskAndCodexOnItsLastMode() {
         context.storage.prefs("hypernova").edit().putString("newSession.codex.mode", AgentKind.CAN_EDIT).apply()
-        val hub = ServerHub(null, null, startModeOwed = "plan")
+        val hub = ServerHub(null, null)
         sheet(hub, project = "/home/owner/projects/hypernova")
-        modeChip(R.string.mode_label_plan).assertExists()
+        modeChip(R.string.mode_label_default).assertExists()
         agent(R.string.cx_agent_codex)
         modeChip(R.string.cx_mode_label_can_edit).assertExists()
     }
 
-    /** Paired later, and older: nothing's kept for it and it isn't owed the old setting. Ask. */
-    @Test fun anOlderServerPairedLaterOpensOnAsk() {
-        sheet(ServerHub(null, null), project = "/home/owner/projects/hypernova")
-        modeChip(R.string.mode_label_default).assertExists()
+    /** A value left from v0.27.0 isn't what the sheet opens on, even if it's never been forgotten yet. */
+    @Test fun anOldSettingLeftBehindIsntWhatItOpensOn() {
+        context.storage.prefs("hypernova").edit().putString("newSession.startMode", "auto").putString("newSession.startModeOwed", "any").apply()
+        sheet(ServerHub("plan", null), project = "/home/owner/projects/hypernova")
+        modeChip(R.string.mode_label_plan).assertExists()
     }
 
     /** Android 35, as PhoneDictationTest: the phone has a recognizer, and the mic may be used. */

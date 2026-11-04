@@ -184,8 +184,8 @@ class SettingsTabTest {
         val vm = show()
         val id = Core.activeId!!
         // A read aloud setting comes with the server's own voices; it's in SettingsPlanTest, and its section on its own in ReadAloudLiveTest.
-        // New sessions start in went to each agent's settings on each server: it's not the phone's.
-        rule.onNode(hasText(str(R.string.st_new_sessions).uppercase())).assertDoesNotExist()
+        // What new sessions start in is each agent's own setting on each server: it's not the phone's.
+        rule.onNode(hasText("NEW SESSIONS")).assertDoesNotExist()
         for ((text, section) in listOf(R.string.st_display to "Display", R.string.about to "About", R.string.st_term_engine to "Terminal engine")) {
             rule.onNode(hasText(str(text).uppercase())).assertExists("the tab: $section")
         }

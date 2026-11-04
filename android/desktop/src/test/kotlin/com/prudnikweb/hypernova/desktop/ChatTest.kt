@@ -606,8 +606,8 @@ class ChatTest {
         d.snapshot = snapshot("z2", sessions = listOf(session("s1", state = "needs_you", title = name)), approvals = listOf(bash("a1", "ls")))
         history(user("u1", "One"), reply("r1", "Two"), user("u2", "Three"), reply("r2", "Four"))
         up()
-        // The top bar's New session, Sessions, History, Settings and Pair another, then Deny and Allow.
-        repeat(7) {
+        // The top bar's New session, Sessions, History, Statistics, Settings and Pair another, then Deny and Allow.
+        repeat(8) {
             onRoot().performKeyInput { pressKey(Key.Tab) }
             waitForIdle()
         }

@@ -5,8 +5,10 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.printToString
 import androidx.compose.ui.test.runDesktopComposeUiTest
 import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.data.live.FakeDaemon
@@ -59,7 +61,15 @@ class RulesScreenTest {
     }
 
     /** The answer comes over a real socket, so a request having been made doesn't mean it's drawn yet. */
-    private fun ComposeUiTest.drawn(text: String) = until(text) { onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() }
+    private fun ComposeUiTest.drawn(text: String) {
+        try {
+            // Long, for a whole suite on a busy machine: the first GET has a client of its own to connect (Api.getSlow).
+            until(text, timeoutMs = 90_000) { onAllNodes(hasText(text)).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: Throwable) {
+            val asked = daemons.sumOf { it.count("GET", "/v1/agents/rules") }
+            throw AssertionError("not drawn: $text\nThe rules asked for $asked times.\nOn screen:\n${onRoot(useUnmergedTree = true).printToString()}", e)
+        }
+    }
 
     private fun ComposeUiTest.openClaude(d: FakeDaemon) {
         setContent { App(shell, reduced = true) }

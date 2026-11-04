@@ -15,7 +15,9 @@ To see exactly what changed: `git diff -M c64bbf9`.
 The Mac app, the glasses app (Lens), the website, the name service and the built-in Tailscale node were
 removed, so the phone reaches the server only over the local network or a VPN into it. Much of the
 Android app's data layer moved to `android/shared`, and many features were added and changed in the app
-and the daemon. `docs/DECISIONS.md` has the reasons.
+and the daemon. The client's Statistics screen was written again from what it does, not from the original's code: the
+daemon's part of Statistics and `android/.../data/Stats.kt` are still the original's, modified (`docs/DECISIONS.md`,
+"Statistics, written new", says what that does and doesn't amount to). `docs/DECISIONS.md` has the reasons.
 
 ## Which files say so
 

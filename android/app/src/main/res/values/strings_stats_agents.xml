@@ -21,6 +21,8 @@
     </plurals>
     <string name="stats_said_hm">%1$s %2$s</string>
 
+    <string name="stats_agent_codex">Codex</string>
+
     <!-- The last 30 days' readout:a day's Codex share after its hours and tokens ("CODEX 5m"); TalkBack appends it. -->
     <string name="stats_day_codex_said">%1$s, Codex %2$s</string>
 

@@ -368,8 +368,8 @@ rules, and weaknesses in the VPN or the operating system.
     "Agent settings"). The only route that writes those files, so a new surface. The threat is a stolen pairing:
     a device token and its certificate, taken from a phone or a backup of it. With them, an attacker can move
     the starting permission mode as far as `auto`, Codex's sandbox as far as `workspace-write`, and pick the update
-    channel, a model and a web search setting, for new sessions on that server. They can undo the last change,
-    unless what it would restore is off the list.
+    channel, a model and a web search setting, for new sessions on that server: in a terminal, and what a client's
+    New session opens on. They can undo the last change, unless what it would restore is off the list.
 
     What holds on the server, whoever is asking: only the listed keys and values. `bypassPermissions`,
     `approval_policy = "never"` and `danger-full-access` can't be set, nor restored by Undo, and `hooks`, `env`,
@@ -382,6 +382,12 @@ rules, and weaknesses in the VPN or the operating system.
     sessions, answer approvals and open terminals on the server, where these files can be edited directly. Forgetting
     the device ends it. Backups hold whole settings files, secrets in `env` included: 0600 in a 0700 folder under
     `<support>`, 20 per agent, and they go with the state folder.
+
+    **What a form opens on comes from these files, which anything on the server can write.** Bypass, `dontAsk`,
+    `danger-full-access` and approval `never` never reach a form, and a form always names its mode, so a file holding one
+    can't start a client's session in it. **Accepted:** `auto` or `workspace-write` written there by hand, by a terminal's
+    `/config`, or by an agent's own session opens a form on it with no confirm, as those writers ask nothing. The form shows
+    it before Start, and it's no wider than the row could set.
 
 18. **Managing an agent's MCP servers from a paired phone** (`docs/PROTOCOL.md`, "An agent's MCP servers", 2026-11-02; `docs/DECISIONS.md`, "Managing MCP servers from the phone"). This one can run a program on the server by design: add a stdio server,
     or approve a project's. The threat is a stolen pairing again. **The confirm is the client's own check; the server only sees the claim, `confirmRun`**, as with an automation's `confirmShell`, and refuses without it. A stolen token sends the claim.

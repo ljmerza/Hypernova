@@ -40,8 +40,10 @@ export type ClaudeSummary = {
   plugins: { name: string; on: boolean | null }[] | null
   mcpServers: string[] | null
   hookEvents: string[] | null
-  /** Names not sent: they don't look like a name, might be a secret, or are past the cap. */
+  /** Names not sent, of all these lists: they don't look like a name, might be a secret, or are past the cap. */
   hidden: number
+  /** The part of [hidden] that's hook events: the one list here a client still shows. */
+  hiddenHooks: number
 }
 export type CodexSummary = { projects: number | null; mcpServers: string[] | null; hidden: number }
 
@@ -206,9 +208,13 @@ export function claudeSettings(dir: string = CLAUDE_DIR): AgentSettings<ClaudeSu
     rules: { allow: rule('allow'), ask: rule('ask'), deny: rule('deny') },
     plugins: plugins(),
     mcpServers: sendable('mcpServers'),
-    hookEvents: sendable('hooks'),
+    hookEvents: null,
     hidden: 0,
+    hiddenHooks: 0,
   }
+  const beforeHooks = hidden
+  summary.hookEvents = sendable('hooks')
+  summary.hiddenHooks = hidden - beforeHooks
   summary.hidden = hidden
   return { state: 'ok', values, summary }
 }

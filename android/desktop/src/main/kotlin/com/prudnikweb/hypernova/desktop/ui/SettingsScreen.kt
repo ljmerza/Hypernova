@@ -1,6 +1,7 @@
 package com.prudnikweb.hypernova.desktop.ui
 
 import com.prudnikweb.hypernova.ui.components.GlassCard
+import com.prudnikweb.hypernova.ui.components.HomeMark
 import com.prudnikweb.hypernova.ui.components.Pill
 import com.prudnikweb.hypernova.ui.components.PillKind
 import com.prudnikweb.hypernova.ui.components.Seam
@@ -81,6 +82,8 @@ fun SettingsScreen(shell: Shell) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Column(Modifier.widthIn(max = COLUMN).fillMaxWidth()) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                HomeMark(shell::goHome, target = 32.dp)
+                Spacer(Modifier.width(12.dp))
                 HText(Ui.desk_settings.text(), Modifier.weight(1f).semantics { heading() }, style = Type.title)
                 Pill(Ui.back.text(), { shell.settings = false }, kind = PillKind.Ghost, height = 32.dp)
             }

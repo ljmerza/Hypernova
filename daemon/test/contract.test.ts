@@ -603,18 +603,17 @@ test('{t:"claude"} and POST /v1/claude', async () => {
   assert.equal(heard('claude').claude.loginContinue, false)
   assert.equal((await post('/v1/claude', {})).status, 400)
   await ok(post('/v1/claude', { loginContinue: true }))
-  // New sessions start in (start-modes.ts): what a form opens on, kept here, one of the agent's own.
-  contract('rest-claude-start-mode', await ok(post('/v1/claude', { startMode: 'plan' })))
-  assert.equal(heard('claude').claude.startMode, 'plan')
-  for (const startMode of ['bypassPermissions', 'dontAsk', 'workspace-write', 'danger-full-access', '', 3]) {
-    const r = await post('/v1/claude', { startMode, loginContinue: false })
-    assert.equal(r.status, 400, String(startMode))
-    assert.equal(r.json.error.code, 'bad_mode')
-  }
-  // A phone moving its old setting: only where nothing's saved.
-  assert.equal((await ok(post('/v1/claude', { moveStartMode: 'auto' }))).claude.startMode, 'plan')
-  assert.equal((await post('/v1/claude', { moveStartMode: 'bypassPermissions' })).status, 400)
-  assert.equal((await ok(post('/v1/claude', { startMode: 'default' }))).claude.loginContinue, true, 'the refused one changed nothing else')
+  // An app from before the agent's own setting was the one (v0.27.0): its row is told where it went, its one-time
+  // move is taken as done so it stops trying, and neither writes anything.
+  const before = (await ok(get('/v1/snapshot'))).claude
+  const moved = await post('/v1/claude', { startMode: 'auto' })
+  assert.equal(moved.status, 400)
+  contract('rest-claude-start-mode', { status: moved.status, ...moved.json })
+  assert.equal((await ok(post('/v1/claude', { moveStartMode: 'auto' }))).claude.startMode, before.startMode)
+  assert.equal((await ok(get('/v1/snapshot'))).claude.startMode, before.startMode, 'an older app can\'t set it')
+  assert.equal((await ok(post('/v1/claude', { startMode: 'auto', loginContinue: true }))).claude.startMode, before.startMode, 'beside a real change, it\'s ignored as any unknown field is')
+  assert.equal(existsSync(join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json')), true, 'the world\'s own, untouched')
+  assert.equal(JSON.parse(readFileSync(join(process.env.CLAUDE_CONFIG_DIR!, 'settings.json'), 'utf8')).permissions?.defaultMode, undefined)
 })
 
 test('{t:"files"} and {t:"lan"}', async () => {
@@ -1170,6 +1169,9 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
     contract('rest-agent-settings-put', changed)
     contract('ws-agent-settings', heard('agent_settings'))
     assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'plan')
+    // The one starting mode (start-modes.ts): the row's change reaches every client's next form, at once.
+    assert.equal(heard('claude').claude.startMode, 'plan')
+    assert.equal((await ok(get('/v1/snapshot'))).claude.startMode, 'plan')
 
     // Refusals, as the phone shows them. None of them writes.
     const refusedKey = await refused(put({ agent: 'claude', key: 'hooks', value: 'x', expected: changed.hash }), 403)
@@ -1182,6 +1184,32 @@ test('GET /v1/agents/settings: the fixed list and the summaries, from scratch fi
 
     contract('rest-agent-settings-undo', await ok(post('/v1/agents/settings/undo', { agent: 'claude', expected: changed.hash })))
     assert.equal(JSON.parse(readFileSync(claudeFile, 'utf8')).permissions.defaultMode, 'acceptEdits')
+    assert.equal(heard('claude').claude.startMode, 'acceptEdits')
+    // Codex's file above says workspace-write with a table for approvals, which a thread from here wouldn't follow: Read only.
+    assert.equal((await ok(get('/v1/snapshot'))).codex.startMode, 'read-only')
+    {
+      const held = readFileSync(codexFile, 'utf8')
+      writeFileSync(codexFile, held.replace(/approval_policy = .*\n/, ''))
+      assert.equal((await ok(get('/v1/snapshot'))).codex.startMode, 'workspace-write', 'asking not set is on-request')
+      const seen = await ok(get('/v1/agents/settings'))
+      const tighter = await ok(put({ agent: 'codex', key: 'sandbox_mode', value: 'read-only', expected: seen.codex.hash }))
+      assert.equal(heard('codex').codex.startMode, 'read-only', 'the row reaches the next form')
+      await ok(post('/v1/agents/settings/undo', { agent: 'codex', expected: tighter.hash }))
+      assert.equal(heard('codex').codex.startMode, 'workspace-write')
+      writeFileSync(codexFile, held)
+    }
+    // A hand edit: nothing here wrote it, and the next look finds it. Bypass is never what a form opens on.
+    {
+      const { sendClaudeStartMode } = await import('../src/http.ts')
+      const held = readFileSync(claudeFile, 'utf8')
+      writeFileSync(claudeFile, JSON.stringify({ ...JSON.parse(held), permissions: { defaultMode: 'bypassPermissions' } }))
+      sendClaudeStartMode()
+      assert.equal(heard('claude').claude.startMode, 'default')
+      assert.equal((await ok(get('/v1/snapshot'))).claude.startMode, 'default')
+      writeFileSync(claudeFile, held)
+      sendClaudeStartMode()
+      assert.equal(heard('claude').claude.startMode, 'acceptEdits')
+    }
     // An agent's MCP servers: the list, a folder's status from a stand-in process, one server's page.
     {
       const { useProbe } = await import('../src/mcp-probe.ts')
@@ -1691,16 +1719,12 @@ test('Codex: POST /v1/codex, GET /v1/codex/models, a Codex session’s model, a 
     const on = await ok(post('/v1/codex', { enabled: true }))
     assert.equal(typeof on.codex.connected, 'boolean')
     contract('rest-codex', { ...on, codex: { ...on.codex, connected: false } })
-    // New sessions start in (start-modes.ts): Codex's own two, and its asking stays on-request whatever this is.
-    const canEdit = await ok(post('/v1/codex', { startMode: 'workspace-write' }))
-    contract('rest-codex-start-mode', { ...canEdit, codex: { ...canEdit.codex, connected: false } })
-    for (const startMode of ['danger-full-access', 'never', 'bypassPermissions', 'plan', 3]) {
-      const r = await post('/v1/codex', { startMode, enabled: false })
-      assert.equal(r.status, 400, String(startMode))
-      assert.equal(r.json.error.code, 'bad_mode')
-    }
+    // An app from before the agent's own setting was the one (v0.27.0): told where it went, nothing changed.
+    const moved = await post('/v1/codex', { startMode: 'workspace-write' })
+    assert.equal(moved.status, 400)
+    contract('rest-codex-start-mode', { status: moved.status, ...moved.json })
+    assert.equal((await ok(get('/v1/codex'))).codex.startMode, 'read-only')
     assert.equal((await ok(get('/v1/codex'))).codex.enabled, true, 'the refused one changed nothing else')
-    await ok(post('/v1/codex', { startMode: 'read-only' }))
     contract('rest-codex-models', await ok(get('/v1/codex/models?fresh=1')))
     fake.reply = 'Made notes.txt'
     const cx = (await ok(post('/v1/sessions', { agent: 'codex', projectPath: cwd, prompt: '[Hypernova test] make notes.txt', clientId: 'client-cx' }))).session.id

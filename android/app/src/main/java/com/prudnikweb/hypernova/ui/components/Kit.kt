@@ -81,6 +81,8 @@ fun ScreenScaffold(
     actions: @Composable RowScope.() -> Unit = {},
     below: (@Composable ColumnScope.() -> Unit)? = null,
     subtitleContent: (@Composable () -> Unit)? = null,
+    /** Beside Back, before the title: only where a title has the room to spare (Statistics' logo). */
+    lead: (@Composable () -> Unit)? = null,
     content: @Composable BoxScope.(top: Dp, source: Modifier) -> Unit,
 ) {
     val haze = LocalHaze.current
@@ -96,6 +98,7 @@ fun ScreenScaffold(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     GlyphButton(Glyph.Back, stringResource(R.string.back), onBack)
                     Spacer(Modifier.width(8.dp))
+                    lead?.invoke()
                     Column(Modifier.weight(1f)) {
                         HText(title, style = Type.title, color = HN.ink, maxLines = 1)
                         if (subtitleContent != null) subtitleContent()

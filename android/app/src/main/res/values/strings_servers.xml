@@ -61,6 +61,9 @@
     <!-- The Settings tab (ui/settings/SettingsPlan.kt): a row per server, then this phone's. -->
     <string name="st_servers">Servers</string>
     <string name="st_server_row_desc">Connection, updates, agents, voices and files</string>
+    <!-- The row that opens Statistics: the server on screen's, or with All servers every one's added up. -->
+    <string name="st_stats_desc">Hours, tokens and projects on %1$s</string>
+    <string name="st_stats_desc_all">Every server\'s hours and tokens, added up</string>
     <string name="st_all_phone">This phone</string>
     <string name="st_typing_voice">Typing and voice</string>
     <string name="st_logs">Logs</string>

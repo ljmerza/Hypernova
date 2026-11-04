@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Modified by Leonardo Merza, 2026. See NOTICE. -->
-<!-- Statistics: how much Claude worked on the Mac (ui/stats/, docs/PROTOCOL.md "Statistics"). The mark in Home's top bar opens it.
+<!-- Statistics: how much Claude worked on the Mac (ui/stats/, docs/PROTOCOL.md "Statistics"). A row on Settings' tab opens it.
      With Codex at work in the range (or leading), the hero, streak, footer and loading line take strings_stats_agents.xml's words. -->
 <resources>
     <string name="stats_title">Statistics</string>
@@ -27,13 +27,15 @@
     <string name="stats_bn">%1$sB</string>
     <!-- TalkBack (and a day without a star's figures): "8h 11m, 855M tokens". -->
     <string name="stats_day_said">%1$s, %2$s tokens</string>
-    <string name="stats_in_project">in %1$s</string>
 
     <!-- The hero. -->
     <string name="stats_claude_worked">Claude worked</string>
     <!-- Sessions that overlap count once here: the time anything ran. -->
     <string name="stats_by_clock">%1$s by the clock</string>
     <string name="stats_agent_work">%1$s of agent work</string>
+    <!-- The same two in the hero's small table: the name on the left, the time on the right. -->
+    <string name="stats_by_clock_row">by the clock</string>
+    <string name="stats_agent_work_row">agent work</string>
     <string name="stats_quiet_today">Quiet so far today.</string>
     <string name="stats_quiet">A quiet stretch.</string>
     <string name="stats_tokens">Tokens</string>
@@ -97,7 +99,8 @@
     <string name="stats_approvals">Approvals</string>
     <string name="stats_ap_phone">phone</string>
     <string name="stats_ap_mac">Mac</string>
-    <string name="stats_counting_since">Counted since %1$s</string>
+    <!-- Under the Work tiles when the range starts before the server began counting what only it sees. -->
+    <string name="stats_counted_what">Phone, spoken and approvals are counted since %1$s.</string>
     <!-- The tokens by kind, under the work. -->
     <string name="stats_tok_out">Out</string>
     <string name="stats_tok_in">In</string>

@@ -40,7 +40,6 @@ import com.prudnikweb.hypernova.data.AgentSettingRefused
 import com.prudnikweb.hypernova.data.AgentSettingsFile
 import com.prudnikweb.hypernova.data.AgentSettingsReply
 import com.prudnikweb.hypernova.data.AgentSettingsTooOld
-import com.prudnikweb.hypernova.data.ClaudeMcp
 import com.prudnikweb.hypernova.data.ClaudeSettingsSummary
 import com.prudnikweb.hypernova.data.CodexSettingsSummary
 import com.prudnikweb.hypernova.data.Confirm
@@ -177,14 +176,9 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                         NavRow(stringResource(R.string.as_skills), stringResource(R.string.as_skills_manage), onClick = onSkills)
                         Hairline(Modifier.fillMaxWidth())
                         NavRow(stringResource(R.string.env_title), stringResource(R.string.env_row), onClick = onEnv)
-                        Hairline(Modifier.fillMaxWidth())
-                        val counts = current?.claude?.let { c -> stringResource(R.string.as_rules_value, c.allow?.toString() ?: "?", c.ask?.toString() ?: "?", c.deny?.toString() ?: "?") }
-                        NavRow(stringResource(R.string.as_rules), if (codex) stringResource(R.string.pr_row_codex) else counts, onClick = onRules)
                     }
                 }
             }
-            // Not in the file: kept by this server's daemon, so it's here whatever the file's state (StartModeRow.kt).
-            if ((if (codex) hub.codex else hub.claude) != null) item(key = "start-mode") { StartModeSection(hub, agent) }
             item(key = "intro") {
                 // Not until the server's said otherwise is there anything to promise about changing them.
                 val viewOnly = tooOld || (current != null && current.editable.isEmpty())
@@ -218,17 +212,6 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                     file.whyNot?.let { why -> whyNotWords(why)?.let { words -> item(key = "why-not") { HText(stringResource(words, server), style = Type.small, color = HN.amber, modifier = Modifier.padding(horizontal = 4.dp)) } } }
                     if (file.state != AgentSettingsFile.OK) {
                         item(key = "state") { FileState(file.state, codex, server) }
-                        // Claude Code's MCP servers aren't in that file, so they're there all the same.
-                        file.mcp?.let { m ->
-                            item(key = "mcp") {
-                                GlassCard(Modifier.fillMaxWidth()) {
-                                    Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                                        McpRow(m, null)
-                                        Hidden(m.hidden)
-                                    }
-                                }
-                            }
-                        }
                     }
                     // A file that isn't there yet: what can be set by making it, each not set.
                     val rows = when {
@@ -253,8 +236,17 @@ fun AgentSettingsScreen(hub: Hub, agent: String, onBack: () -> Unit, onMcp: () -
                     }
                     if (file.state == AgentSettingsFile.OK) {
                         item(key = "summary-seam") { Seam(stringResource(R.string.as_summary), modifier = Modifier.padding(horizontal = 4.dp).padding(top = 14.dp, bottom = 2.dp)) }
-                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s, file.mcp) } }
-                        file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s) } }
+                        file.claude?.let { s -> item(key = "summary") { ClaudeSummaryCard(s, onRules) } }
+                        file.codex?.let { s -> item(key = "summary") { CodexSummaryCard(s, onRules) } }
+                    } else {
+                        // With no file there's no summary, and adding a rule is how the file gets made. A broken one's screen says what's wrong.
+                        item(key = "rules") {
+                            GlassCard(Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(horizontal = 16.dp, vertical = 2.dp)) {
+                                    NavRow(stringResource(R.string.as_rules), if (codex) stringResource(R.string.pr_row_codex) else null, onClick = onRules)
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -478,34 +470,22 @@ private fun PickerSheet(edit: EditableSetting, now: ShownSetting?, name: String?
     }
 }
 
+/** What no row above manages. MCP servers, plugins and skills each have their own row, so their names aren't listed again here. */
 @Composable
-private fun ClaudeSummaryCard(s: ClaudeSettingsSummary, mcp: ClaudeMcp?) {
-    val unrecognised = stringResource(R.string.as_unrecognised)
+private fun ClaudeSummaryCard(s: ClaudeSettingsSummary, onRules: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-            NamesRow(
-                stringResource(R.string.as_plugins),
-                s.plugins?.map { p ->
-                    val state = when (p.on) {
-                        true -> stringResource(R.string.as_on)
-                        false -> stringResource(R.string.as_off)
-                        null -> unrecognised
-                    }
-                    "${p.name}: $state"
-                },
-                null,
-            )
-            Hairline(Modifier.fillMaxWidth())
-            McpRow(mcp, s.mcpServers)
+            val count = { n: Int? -> n?.toString() ?: "?" }
+            NavRow(stringResource(R.string.as_rules), stringResource(R.string.as_rules_value, count(s.allow), count(s.ask), count(s.deny)), onClick = onRules)
             Hairline(Modifier.fillMaxWidth())
             NamesRow(stringResource(R.string.as_hooks), s.hookEvents, stringResource(R.string.as_hooks_body))
-            Hidden(s.hidden + (mcp?.hidden ?: 0))
+            Hidden(s.hiddenHooks)
         }
     }
 }
 
 @Composable
-private fun CodexSummaryCard(s: CodexSettingsSummary) {
+private fun CodexSummaryCard(s: CodexSettingsSummary, onRules: () -> Unit) {
     GlassCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
             ReadOnlyRow(
@@ -515,8 +495,7 @@ private fun CodexSummaryCard(s: CodexSettingsSummary) {
                 stringResource(R.string.as_projects_body),
             )
             Hairline(Modifier.fillMaxWidth())
-            NamesRow(stringResource(R.string.as_mcp), s.mcpServers, null)
-            Hidden(s.hidden)
+            NavRow(stringResource(R.string.as_rules), stringResource(R.string.pr_row_codex), onClick = onRules)
         }
     }
 }
@@ -563,49 +542,6 @@ private fun NamesRow(label: String, names: List<String>?, body: String?) {
         if (!names.isNullOrEmpty()) {
             Spacer(Modifier.height(6.dp))
             HText(names.joinToString("\n"), style = Type.monoSmall, color = HN.inkMuted)
-        }
-    }
-}
-
-/**
- * Claude Code's MCP servers (docs/DECISIONS.md, "The agents' settings, viewed"): the server's own, then
- * each project's under its name, names only, with a cap per group and on the groups. [older]: the
- * names in settings.json, all a server without `mcp` sends.
- */
-@Composable
-private fun McpRow(mcp: ClaudeMcp?, older: List<String>?) {
-    if (mcp == null) {
-        NamesRow(stringResource(R.string.as_mcp), older, stringResource(R.string.as_mcp_claude_body))
-        return
-    }
-    val (groups, moreProjects) = mcp.groups()
-    val trouble = mcp.state == AgentSettingsFile.MALFORMED || mcp.state == AgentSettingsFile.UNREADABLE
-    Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}.padding(vertical = 10.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            HText(stringResource(R.string.as_mcp), style = Type.body, color = HN.ink, modifier = Modifier.weight(1f))
-            if (mcp.servers.isEmpty()) HText(stringResource(R.string.as_none), style = Type.monoSmall, color = HN.inkDim, maxLines = 1)
-            else HText(mcp.servers.size.toString(), style = Type.monoSmall, color = HN.ink, maxLines = 1)
-        }
-        Spacer(Modifier.height(2.dp))
-        HText(stringResource(R.string.as_mcp_claude_body), style = Type.small, color = HN.inkDim)
-        if (trouble) {
-            Spacer(Modifier.height(6.dp))
-            HText(stringResource(R.string.as_mcp_trouble), style = Type.small, color = HN.amber)
-        }
-        groups.forEach { g ->
-            Spacer(Modifier.height(10.dp))
-            HText(g.project ?: stringResource(R.string.as_mcp_here), style = Type.small, color = HN.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(2.dp))
-            HText(g.names.joinToString("\n"), style = Type.monoSmall, color = HN.inkMuted)
-            if (g.more > 0) HText(pluralStringResource(R.plurals.as_mcp_more, g.more, g.more), style = Type.small, color = HN.inkDim)
-        }
-        if (moreProjects > 0) {
-            Spacer(Modifier.height(10.dp))
-            HText(pluralStringResource(R.plurals.as_mcp_more_projects, moreProjects, moreProjects), style = Type.small, color = HN.inkDim)
-        }
-        if (mcp.foldersNotRead > 0) {
-            Spacer(Modifier.height(10.dp))
-            HText(pluralStringResource(R.plurals.as_mcp_not_read, mcp.foldersNotRead, mcp.foldersNotRead), style = Type.small, color = HN.inkDim)
         }
     }
 }
@@ -709,8 +645,10 @@ internal fun whenWords(key: String): Int? = when (if (effortModelOf(key) != null
     "showThinkingSummaries" -> R.string.as_when_maybe_new_session
     "autoUpdatesChannel" -> R.string.as_when_next_update
     "model", "model_reasoning_effort", "web_search" -> R.string.as_when_new_threads
-    // Hypernova's own thread/start names its sandbox and approvals (codex/sessions.ts).
-    "approval_policy", "sandbox_mode" -> R.string.as_when_new_threads_unchosen
+    // Hypernova's own thread/start names its approvals (codex/sessions.ts).
+    "approval_policy" -> R.string.as_when_new_threads_unchosen
+    // And its sandbox, which a form opens on from here (daemon/src/start-modes.ts).
+    "sandbox_mode" -> R.string.as_when_new_threads_everywhere
     else -> null
 }
 

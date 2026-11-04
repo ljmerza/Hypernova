@@ -5,8 +5,8 @@ package com.prudnikweb.hypernova.data
 /**
  * What the new-session sheet starts with next time: the project, provider, model and Claude Code's
  * effort the last session was started with, kept on the phone. Fork: the mode isn't the last one
- * used but what that server keeps for that agent ([NewSessionMemory.startsIn]); [codexMode] is only for
- * a server too old to keep it. With Codex (data/Codex.kt): which agent, and Codex's own model and
+ * used but that agent's own setting on that server ([NewSessionMemory.startsIn]); [codexMode] is only for
+ * a server too old to say it. With Codex (data/Codex.kt): which agent, and Codex's own model and
  * reasoning effort, kept apart from Claude's.
  */
 data class Remembered(
@@ -38,13 +38,13 @@ object NewSessionMemory {
     private const val PROJECT = "newSession.project"
     private const val PROVIDER = "newSession.provider"
     private const val MODEL = "newSession.model."
-    private const val START_MODE = "newSession.startMode"
-    private const val START_MODE_OWED = "newSession.startModeOwed"
     private const val AGENT = "newSession.agent"
     private const val CODEX_MODEL = "newSession.codex.model"
     private const val CODEX_EFFORT = "newSession.codex.effort"
     private const val CODEX_MODE = "newSession.codex.mode"
     private const val EFFORT = "newSession.effort"
+    private const val OLD_START_MODE = "newSession.startMode"
+    private const val OLD_START_MODE_OWED = "newSession.startModeOwed"
 
     /**
      * Fork: the modes a new Claude session can start in (owner, 2026-10-30): Ask, Accept edits, Plan
@@ -56,52 +56,27 @@ object NewSessionMemory {
     fun startMode(saved: String?): String = saved?.takeIf { it in START_MODES } ?: "default"
 
     /**
-     * What a form opens on for [agent] (docs/DECISIONS.md, "New sessions start in, per server and agent"):
-     * what the server said ([served]), only ever one of that agent's own modes, so another agent's word,
-     * Bypass or `danger-full-access` is Ask or Read only. [served] null, a server too old to keep it: for
-     * Claude Code the old setting if this server is still [owed] it, else Ask; for Codex its last mode here.
+     * What a form opens on for [agent] (docs/DECISIONS.md, "One starting mode, the agent's own"): what the
+     * server said ([served]), from that agent's own file there, only ever one of that agent's own modes, so
+     * another agent's word, Bypass or `danger-full-access` is Ask or Read only. [served] null, a server too
+     * old to say: Ask for Claude Code, and for Codex its last mode here.
      */
-    fun startsIn(agent: String, served: String?, owed: String?, memory: Remembered): String = when {
+    fun startsIn(agent: String, served: String?, memory: Remembered): String = when {
         agent == AgentKind.CODEX -> if (served != null) keptCodexMode(served) else memory.codexMode
-        else -> startMode(served ?: owed)
+        else -> startMode(served)
     }
 
     fun startsIn(agent: String, hub: Hub, memory: Remembered): String =
-        startsIn(agent, if (agent == AgentKind.CODEX) hub.codex?.startMode else hub.claude?.startMode, hub.startModeOwed, memory)
+        startsIn(agent, if (agent == AgentKind.CODEX) hub.codex?.startMode else hub.claude?.startMode, memory)
 
     /**
-     * At each start ([Core.init]): who's still owed the old phone-wide setting. The first start finds no list
-     * and writes the servers paired then ([paired]). Nothing adds to it after that, so a server paired later
-     * never gets it. A server forgotten leaves it, and with nobody left, or nothing worth moving, the old
-     * value and the list are gone for good.
+     * At each start ([Core.init]): the phone-wide setting from before v0.27.0, and the list of servers v0.27.0
+     * still owed it, go. Forms open on the agent's own file now, and writing this there would loosen asks with
+     * no check, so it isn't moved anywhere.
      */
-    fun noteStartModeServers(storage: Storage, paired: List<String>) {
+    fun forgetOldStartMode(storage: Storage) {
         val p = storage.prefs(PREFS)
-        val old = p.getString(START_MODE, null) ?: return
-        writeOwed(p, if (!worthMoving(old)) emptyList() else if (p.contains(START_MODE_OWED)) owed(p).filter { it in paired } else paired)
-    }
-
-    /** The old setting, while server [serverId] is still owed it; null otherwise. */
-    fun startModeToMove(storage: Storage, serverId: String): String? {
-        val p = storage.prefs(PREFS)
-        return p.getString(START_MODE, null)?.takeIf { serverId in owed(p) && worthMoving(it) }
-    }
-
-    /** Server [serverId] has it: off the list, and the last one takes the old value with it. */
-    fun startModeMoved(storage: Storage, serverId: String) {
-        val p = storage.prefs(PREFS)
-        writeOwed(p, owed(p) - serverId)
-    }
-
-    /** Ask is what nothing saved means, and anything else that isn't a start mode (Bypass, Codex's words) is never one. */
-    private fun worthMoving(mode: String) = mode in START_MODES && mode != "default"
-
-    private fun owed(p: Prefs): List<String> = p.getString(START_MODE_OWED, null)?.split(',').orEmpty()
-
-    private fun writeOwed(p: Prefs, owed: List<String>) {
-        val e = p.edit()
-        if (owed.isEmpty()) e.remove(START_MODE).remove(START_MODE_OWED) else e.putString(START_MODE_OWED, owed.joinToString(","))
-        e.apply()
+        if (p.contains(OLD_START_MODE) || p.contains(OLD_START_MODE_OWED)) p.edit().remove(OLD_START_MODE).remove(OLD_START_MODE_OWED).apply()
     }
 
     /**

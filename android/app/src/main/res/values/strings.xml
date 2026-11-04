@@ -104,11 +104,6 @@
     <string name="st_term_ghostty">Draw terminals with Ghostty</string>
     <string name="st_term_ghostty_desc">A trial: Ghostty\'s terminal core instead of xterm.js. The next terminal you open uses it.</string>
     <!-- Fork: an agent's settings → New sessions (the mode that agent's new sessions open on, per server; ui/settings/StartModeRow.kt). -->
-    <string name="st_new_sessions">New sessions</string>
-    <string name="st_start_mode">New sessions start in</string>
-    <string name="st_start_mode_claude">What New session opens on for Claude Code on %1$s, here and on the desktop client. Changing it there is for that session only, and Bypass is chosen there each time.</string>
-    <string name="st_start_mode_codex">What New session opens on for Codex on %1$s, here and on the desktop client. Changing it there is for that session only.</string>
-    <string name="st_start_mode_too_old">%1$s needs updating to keep this. Until then New session opens on what this phone has for it.</string>
     <!-- A table in a reply: what TalkBack says for a cell ("Tokens: 3.2k"), and an action on its rows. -->
     <string name="table_cell">%1$s: %2$s</string>
     <string name="copy_table">Copy table</string>
@@ -974,8 +969,8 @@
     <string name="mermaid_show_code">Show the code</string>
     <string name="mermaid_show_diagram">Show the diagram</string>
     <string name="mermaid_close">Close</string>
-    <!-- The mark in Home's top bar opens Statistics (it did from the sun, before the sky went). -->
-    <string name="stats_open_label">Open Statistics</string>
+    <!-- The logo in a top bar, for TalkBack: wherever it's shown it goes to the Sessions list, at its top. -->
+    <string name="home_mark_label">Go to the sessions list</string>
     <!-- An agent's settings on the server, to view (ui/settings/AgentSettings.kt). -->
     <string name="as_row">Settings</string>
     <string name="as_row_claude">Effort, permission mode and more, from the server\'s settings.json</string>
@@ -1033,6 +1028,7 @@
     <string name="as_when_maybe_new_session">May need a new session.</string>
     <string name="as_when_next_update">Applies at the next update.</string>
     <string name="as_when_new_threads">Applies to new threads.</string>
+    <string name="as_when_new_threads_everywhere">Applies to new threads: in a terminal, in this app and on the desktop client. New session opens on Read only if this is Full access, or if Approvals is set to anything but On request.</string>
     <string name="as_when_new_threads_unchosen">Applies to new threads that don\'t choose their own. Ones started from this app do.</string>
     <!-- What a value allows, in the picker and in the confirm. -->
     <string name="as_l_plan">Planning only: it reads and proposes, and changes nothing.</string>
@@ -1367,7 +1363,6 @@
     <string name="mcp_f_client_secret">OAuth client secret</string>
     <string name="mcp_f_secrets_note">A secret you type goes to %1$s and never comes back to this phone. Anything still masked here keeps its value on the server.</string>
     <string name="mcp_f_save">Save</string>
-    <string name="as_mcp_claude_body">From ~/.claude.json, each project\'s .mcp.json and this settings.json. Names only. Plugins can add servers of their own, and those aren\'t listed.</string>
     <string name="sm_label">%1$s · MCP servers</string>
     <string name="sm_empty">No MCP servers for this folder</string>
     <string name="sm_note">What\'s set up for this folder, not whether it\'s connected. One from a project\'s .mcp.json may still be waiting for approval, and plugins\' aren\'t listed.</string>
@@ -1381,16 +1376,7 @@
         <item quantity="one">Plus %1$d for all projects.</item>
         <item quantity="other">Plus %1$d for all projects.</item>
     </plurals>
-    <string name="as_mcp_here">On this server</string>
     <string name="as_mcp_trouble">~/.claude.json couldn\'t be read, so this list may be short.</string>
-    <plurals name="as_mcp_more">
-        <item quantity="one">%1$d more</item>
-        <item quantity="other">%1$d more</item>
-    </plurals>
-    <plurals name="as_mcp_more_projects">
-        <item quantity="one">%1$d more project</item>
-        <item quantity="other">%1$d more projects</item>
-    </plurals>
     <plurals name="as_mcp_not_read">
         <item quantity="one">%1$d more project folder wasn\'t read.</item>
         <item quantity="other">%1$d more project folders weren\'t read.</item>
@@ -1413,7 +1399,7 @@
     <string name="as_effort_of">Effort for %1$s</string>
     <string name="as_when_effort">Applies to new sessions on this model.</string>
     <string name="as_k_mode">Starting permission mode</string>
-    <string name="as_k_mode_body">The mode a session started in a terminal begins in. Ones started from this app use New sessions start in, above.</string>
+    <string name="as_k_mode_body">What new sessions start in: in a terminal, in this app and on the desktop client. In a terminal, a project\'s own settings can override it. If this is Bypass, Don\'t ask or a word Hypernova doesn\'t know, New session opens on Ask. Bypass is only chosen there, each time.</string>
     <string name="as_k_thinking">Thinking summaries</string>
     <string name="as_k_thinking_body">Shows summaries of Claude\'s thinking when it\'s expanded. It changes what you see, not what the model does.</string>
     <string name="as_k_dream">Background memory consolidation</string>
