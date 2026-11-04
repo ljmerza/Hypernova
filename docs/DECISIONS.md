@@ -4503,3 +4503,13 @@ The owner: "[between] my app and then the terminal there's two different timings
 8. **"At once" is what's running now, not Claude Code's 6:** started (PreToolUse) and not finished. Six in one reply it runs in turn count as one each.
 9. **By kind of session:** a shared terminal has all of it. An SDK session has all of it from the transcript, tokens once a reply is whole. Codex has what it's doing, the turn, the step, at once and its own token count, none of it from a screen. A Mac older than this shows the activity line and the turn's time, with the stops in.
 10. **Background commands stay out** (the session sheet's Agents tab, another branch); a row of theirs would go last in the panel.
+
+## One shared UI module, split by folder, with checks (2026-11-03)
+
+The owner: "let's make sure that we are modularizing this correctly so shared components or whatever are properly architected I want to try to prioritize maintainability over all these different operating systems because I'll be adding a lot of features and customer ability". Of three ways, they chose one: "the option one is fine".
+
+1. **One `:sharedui` module split by folder, with automated checks** (chosen). Simple to work in, and it can split later when build times hurt.
+2. A separate module per feature: the strongest walls and faster builds at size, but too much build setup for one person, and too early.
+3. Shared logic only, with each system drawing its own screens: it can't break another system, but every feature gets built twice, which is what this is meant to avoid.
+
+The rules are in `CLAUDE.md`, "Architecture". `scripts/arch-check.py` and `:app:checkRuntimeClasspath` enforce them (`docs/PLATFORMS.md`, "The rules' checks"). Parts and state are shared; each system may lay them out its own way. Voice, the terminal, the camera, file picking and the widget stay per system.

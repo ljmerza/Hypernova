@@ -52,11 +52,11 @@ android/app       the phone: a thin shell        android/desktop  the desktop: a
 - **Share the parts and the state; each system may lay them out its own way.** The phone stacks screens and the desktop has two panes. A forced single layout makes both worse.
 - **OS differences go behind a small named interface**, so adding a system means implementing that list. Prefer a few well-named seams over many one-off lambdas.
 - **Customisation builds on the tokens and on settings described as data**, so a new setting or theme reaches every system without per-OS work.
-- **A shared UI library version moves the phone too.** `:app`'s runtime classpath stays the same list plus `:sharedui` unless that's a chosen change: JetBrains' `foundation` and `animation` are `compileOnly` in `commonMain` for this reason. Report it before and after any change to `sharedui`'s dependencies.
+- **A shared UI library version moves the phone too.** `:app`'s runtime classpath stays the same list plus `:sharedui` unless that's a chosen change: JetBrains' `foundation` and `animation` are `compileOnly` in `commonMain` for this reason. The list is checked in as `android/app/classpath-debug.txt` and `classpath-release.txt`: a chosen change runs `:app:writeRuntimeClasspath` and commits them with it.
 - **Strings:** a new string that shared code uses is a line in `Str.kt` and in `StringIds.kt`. Words live in the phone's `res/values`, read at run time on the desktop and held there by `WordsTest`; desktop-only ones are in `strings_desktop.xml`.
 - **No two modules with the same file name in the same package:** they clash at dex as the same `XKt` class.
 - **`SharedUi.install` comes first** in both apps. A test with no install silently gets the default font.
-- **Not everything is shared yet.** `docs/PLATFORMS.md`, "The shared drawing", lists what's left, and the phone's `ui/` still holds most screens. These rules aren't all enforced by a build check yet: until they are, reviewing them is on you.
+- **Not everything is shared yet.** `docs/PLATFORMS.md`, "The shared drawing", lists what's left, and the phone's `ui/` still holds most screens. `scripts/arch-check.py` and `:app:checkRuntimeClasspath` enforce these rules on every push and pull request (`docs/PLATFORMS.md`, "The rules' checks"). They can't see logic copied under another name: reviewing that is on you.
 - **A new Android permission can change existing features.** Check everything that touches that feature: adding `CAMERA` for Scan made the attachment camera crash in v0.26.0.
 
 ## Testing
@@ -75,15 +75,16 @@ Tests are how a change is known to work. **Say what ran, what it proved, and wha
 | Desktop | `android/desktop/src/test` | `:desktop:test` | The real screens through `FakeDaemon` over mutual TLS. `RendersTest` draws pictures to `build/renders`; `DemoServerTest` needs a running demo server |
 | Packages | `scripts/test-client-package.sh`, `test-server-deb.sh`, `test-install-macos.sh`, `test-macos-smoke.sh`, `test-get-client.sh`, `test-linux-docker.sh`, `test-linux-systemd.sh` | In a container, or on CI's runners | A package installs, opens, pairs and uninstalls as a person would. Mac and Windows only run on CI |
 | Release scripts | `scripts/test-next-version.sh`, `test-license-notices.sh` | By hand | Versions, release notes and licence notices |
+| Architecture | `scripts/arch-check.py`, `scripts/test-arch-check.py`, `:app:checkRuntimeClasspath` | `scripts/arch-check.py` (2 seconds, no compile); `scripts/test-arch-check.py`, with `--gradle` for the classpath's half; CI runs all of them | The modules' rules hold, new breaches fail, and `:app`'s runtime classpath is the checked-in list. Not logic copied under another name |
 | By eye | The emulator (AVDs `hn-demo`, `hn-art`), a real window under Xvfb in a container, `demo/server.ts`, `scripts/demo-shots.sh` | By hand | It really draws. Look at the screenshots yourself |
 | Real device | The owner's phone; the checklist at `http://127.0.0.1:47322/qa`, results in `<support>/qa/` | The owner | The only proof of feel, a real camera, real sign-ins and real updates. Read the results first when the owner says they've tested |
 
-**Everything, from `android/`:**
+**Everything:** first `scripts/arch-check.py` from the root, then from `android/`:
 
 ```bash
 export JAVA_HOME=$HOME/Android/jdk-21 ANDROID_HOME=$HOME/Android/sdk PATH=$HOME/Android/jdk-21/bin:$PATH
 ./gradlew --no-daemon -q :app:assembleDebug :app:cleanTestDebugUnitTest :app:testDebugUnitTest :app:verifyRoborazziDebug \
-  :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest :desktop:cleanTest :desktop:test --continue
+  :shared:compileKotlinDesktop :shared:desktopTest :shared:testAndroidHostTest :desktop:cleanTest :desktop:test :app:checkRuntimeClasspath --continue
 ```
 
 **The rules:**
