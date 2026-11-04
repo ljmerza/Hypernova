@@ -4210,8 +4210,8 @@ For the daemon and `hn`, not for a client.
 
 #### Typing a prompt
 
-- **`paste`:** only into Claude Code's own input box, and only when it's empty (dim suggestion text
-  doesn't count). The text goes in as a bracketed paste, and Enter follows only once it shows in the
+- **`paste`:** only into Claude Code's own input box, and only when it's empty (dim suggestion or
+  placeholder text doesn't count, nor its one letter under the cursor, inverse and not dim). The text goes in as a bracketed paste, and Enter follows only once it shows in the
   box. A dialog or menu replaces the input box, so Enter never answers one. Prompts are typed one at
   a time.
 - **A command with a long task:** Claude Code folds a long paste (measured on 2.1.316: five lines, or
