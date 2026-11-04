@@ -16,7 +16,7 @@ data class ClaudeState(
     val agents: Boolean? = null,
     /** Sessions the lost login stopped carry on by themselves once it's back (the Mac's settings.loginContinue); null from a Mac that can't. */
     val loginContinue: Boolean? = null,
-    /** What new Claude Code sessions open on, kept on that Mac; null from one too old to keep it ([NewSessionMemory.startsIn]). */
+    /** What new Claude Code sessions open on, from its own settings.json on that Mac; null from one too old to say ([NewSessionMemory.startsIn]). */
     val startMode: String? = null,
 ) {
     companion object {

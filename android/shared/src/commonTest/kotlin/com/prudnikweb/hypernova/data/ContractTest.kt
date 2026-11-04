@@ -411,8 +411,9 @@ class ContractTest {
         "rest-debug-off" to { o -> assertEquals(ServerDebug(false, null), ServerDebug.parse(o.obj("debug"))) },
         "rest-claude" to { o -> assertEquals(ClaudeState(true, "2.1.314", agents = true, loginContinue = true, startMode = "default"), ClaudeState.parse(o.obj("claude"))) },
         "rest-claude-login-continue" to { o -> assertEquals(false, ClaudeState.parse(o.obj("claude"))?.loginContinue) },
-        "rest-claude-start-mode" to { o -> assertEquals("plan", ClaudeState.parse(o.obj("claude"))?.startMode) },
-        "rest-codex-start-mode" to { o -> assertEquals(AgentKind.CAN_EDIT, CodexWire.state(o.obj("codex"))?.startMode) },
+        // What a v0.27.0 app's row is told, in words it shows: nothing's saved.
+        "rest-claude-start-mode" to { o -> refusal(o, 400, "start_mode_moved") },
+        "rest-codex-start-mode" to { o -> refusal(o, 400, "start_mode_moved") },
         // ── Sessions: starting one, its chat, its terminal ──
         // LiveHub.start: the session it applies and opens.
         "rest-sessions-start" to { o ->
@@ -663,7 +664,7 @@ class ContractTest {
                 r.claude.values,
             )
             assertEquals(
-                ClaudeSettingsSummary(2, 1, 0, listOf(PluginSetting("formatter", true), PluginSetting("linter", false)), listOf("home-assistant"), listOf("Stop", "PreToolUse"), 0),
+                ClaudeSettingsSummary(2, 1, 0, listOf(PluginSetting("formatter", true), PluginSetting("linter", false)), listOf("home-assistant"), listOf("Stop", "PreToolUse"), 0, hiddenHooks = 0),
                 r.claude.claude,
             )
             assertNull(r.claude.codex)

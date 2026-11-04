@@ -47,7 +47,7 @@ import { awakeClient, awakeState, setAwake } from './awake.ts'
 import { macFeed } from './mac-feed.ts'
 import { ChangeError, changesOf, diffOf } from './changes.ts'
 import { toolPath } from './normalize.ts'
-import { isStartMode, setStartMode, startMode } from './start-modes.ts'
+import { startMode } from './start-modes.ts'
 import { ResumeError, continueText, setAutoContinue, setLoginContinue, typeContinue } from './resume.ts'
 import { BlockedError, blockedList, dismissBlocked, retryBlocked } from './blocked.ts'
 import { AsideError, askAside, asideOf } from './aside.ts'
@@ -166,6 +166,7 @@ async function settingsModels(): Promise<ModelList> {
 /** A setting changed: the other phones look again, and the pickers' idea of Codex's own default follows. */
 function afterSettingChange(agent: string, key: string): void {
   broadcast({ t: 'agent_settings', agent })
+  sendStartMode(agent)
   if (agent === 'codex' && (key === 'model' || key === 'model_reasoning_effort')) void codexModels(true).catch(() => {})
 }
 
@@ -368,6 +369,23 @@ function afterAgentUpdate(agent: 'claude' | 'codex'): void {
 }
 const claudeState = () => ({ available: claudeHere(), version: claudeVersion(), sdk: sdkState().installed, agents: settings.claudeAgents === true, loginContinue: settings.loginContinue !== false, startMode: startMode('claude') })
 
+/** What clients last heard new Claude Code sessions open on. */
+let claudeModeHeard = ''
+/** The file's mode moved, by a row, the JSON tab, a terminal's `/config` or a hand edit: every client's form follows. main.ts asks every few seconds. */
+export function sendClaudeStartMode(): void {
+  const mode = startMode('claude')
+  if (mode === claudeModeHeard) return
+  claudeModeHeard = mode
+  broadcast({ t: 'claude', claude: claudeState() })
+}
+/** As soon as a change here is saved, rather than at the next look. */
+function sendStartMode(agent: string): void {
+  if (agent === 'claude') sendClaudeStartMode()
+  else sendCodex()
+}
+/** An app from before the agent's own setting was the one (v0.27.0) changing the row it still has: the setting went, so nothing's saved, and it says where. */
+const startModeMoved = (where: string) => new HttpError(400, 'start_mode_moved', `New sessions now start in ${where}, in this agent’s settings. Update the app.`)
+
 function snapshot(deviceId: string | null) {
   return {
     mac: {
@@ -546,15 +564,12 @@ async function api(c: Ctx): Promise<void> {
   // Codex on or off for Hypernova from the phone (Settings → Agents & providers).
   if (path === '/v1/codex' && m === 'POST') {
     const b = await readJsonBody(req)
-    if (typeof b?.enabled !== 'boolean' && b?.startMode === undefined) throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
-    if (b.enabled !== undefined && typeof b.enabled !== 'boolean') throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
-    if (b.startMode !== undefined && !isStartMode('codex', b.startMode)) throw new HttpError(400, 'bad_mode', 'New Codex sessions can start read-only or workspace-write.')
-    if (b.enabled && !codexBinary().ok) throw new HttpError(409, 'no_codex', 'Codex isn’t installed on this computer, or it’s too old for Hypernova.')
-    if (typeof b.enabled === 'boolean') setCodexEnabled(b.enabled)
-    if (b.startMode !== undefined) {
-      setStartMode('codex', b.startMode)
-      sendCodex()
+    if (typeof b?.enabled !== 'boolean') {
+      if (b?.startMode !== undefined) throw startModeMoved('Sandbox')
+      throw new HttpError(400, 'bad_value', 'Say enabled: true or false.')
     }
+    if (b.enabled && !codexBinary().ok) throw new HttpError(409, 'no_codex', 'Codex isn’t installed on this computer, or it’s too old for Hypernova.')
+    setCodexEnabled(b.enabled)
     return json(res, 200, { codex: codexState() })
   }
   // Sessions in `claude agents` on or off from the phone (Settings → Agents & providers → Claude Code):
@@ -562,15 +577,15 @@ async function api(c: Ctx): Promise<void> {
   // So is carrying on by itself after signing in again (resume.ts; Settings → the server's page).
   if (path === '/v1/claude' && m === 'POST') {
     const b = await readJsonBody(req)
-    const wantsMode = b?.startMode !== undefined || b?.moveStartMode !== undefined
-    if (typeof b?.agents !== 'boolean' && typeof b?.loginContinue !== 'boolean' && !wantsMode) throw new HttpError(400, 'bad_value', 'Say agents or loginContinue: true or false.')
-    // Before anything's saved, so a refused mode changes nothing else in the same body.
-    for (const mode of [b.startMode, b.moveStartMode]) if (mode !== undefined && !isStartMode('claude', mode)) throw new HttpError(400, 'bad_mode', 'New Claude Code sessions can start in default, acceptEdits, plan or auto.')
+    if (typeof b?.agents !== 'boolean' && typeof b?.loginContinue !== 'boolean') {
+      // An app from v0.27.0 moving its old setting: there's nowhere to move it, and nothing's written to the agent's
+      // file, so it's taken as done, or the app would try again at every snapshot. Its old value then goes.
+      if (b?.moveStartMode !== undefined) return json(res, 200, { claude: claudeState() })
+      if (b?.startMode !== undefined) throw startModeMoved('Starting permission mode')
+      throw new HttpError(400, 'bad_value', 'Say agents or loginContinue: true or false.')
+    }
     if (typeof b.agents === 'boolean') setClaudeAgents(b.agents)
     if (typeof b.loginContinue === 'boolean') setLoginContinue(b.loginContinue)
-    if (b.startMode !== undefined) setStartMode('claude', b.startMode)
-    // A phone moving its old setting here: a value this server already has stays.
-    if (b.moveStartMode !== undefined) setStartMode('claude', b.moveStartMode, true)
     const claude = claudeState()
     broadcast({ t: 'claude', claude })
     return json(res, 200, { claude })
@@ -669,7 +684,10 @@ async function api(c: Ctx): Promise<void> {
     const deps = {
       folders: () => [...listProjects().map((p) => p.path), ...listSessions().flatMap((s) => (s.cwd ? [s.cwd] : []))],
       body: () => readJsonBody(req),
-      changed: (agent: 'claude' | 'codex') => broadcast({ t: 'agent_settings', agent }),
+      changed: (agent: 'claude' | 'codex') => {
+        broadcast({ t: 'agent_settings', agent })
+        sendStartMode(agent)
+      },
     }
     const area = path.startsWith('/v1/agents/mcp') ? 'mcp' : 'plugin'
     if (await mcpRoute(path, m, url, res, json, deps)) return dbg(area, 'route', { method: m, route: path, agent: url.searchParams.get('agent'), status: res.statusCode })

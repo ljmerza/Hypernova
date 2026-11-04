@@ -13,7 +13,7 @@ export type CodexAccount = { signedIn: boolean; type: string | null; planType: s
 /** Codex's own limits: its 5-hour and weekly windows (either can be missing), and whether one is used up. */
 export type CodexUsage = { fiveHour: Window | null; sevenDay: Window | null; limited: boolean; observedAt: number | null }
 export type CodexState = {
-  /** What new Codex sessions open on in a client's New session form (start-modes.ts). */
+  /** What new Codex sessions open on in a client's New session form: from its own config.toml (start-modes.ts). */
   startMode: string
   /** Installed, at least [min], so it can be used here. */
   available: boolean
