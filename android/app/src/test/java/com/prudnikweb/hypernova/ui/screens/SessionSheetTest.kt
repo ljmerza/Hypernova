@@ -1,5 +1,7 @@
 package com.prudnikweb.hypernova.ui.screens
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -15,6 +17,8 @@ import com.prudnikweb.hypernova.R
 import com.prudnikweb.hypernova.data.AgentBoard
 import com.prudnikweb.hypernova.data.WAgent
 import com.prudnikweb.hypernova.data.WShell
+import com.prudnikweb.hypernova.ui.components.LocalToastNow
+import com.prudnikweb.hypernova.ui.components.ToastNow
 import com.prudnikweb.hypernova.ui.session.SessionSheet
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -69,6 +73,30 @@ class SessionSheetTest {
         rule.onNodeWithText(str(R.string.session_sheet_where).uppercase(), useUnmergedTree = true).assertExists()
         rule.onNodeWithText("j-zeta", useUnmergedTree = true).assertExists()
         // No picture of this tab: its "Started" is a wall-clock time.
+    }
+
+    @Test fun theAppsMessageShowsOnTheSheetAndATapPutsItAway() {
+        val words = "The terminal didn’t answer. Try again in a moment."
+        val said = mutableStateOf<String?>(null)
+        val hub = FakeHub()
+        val s = hub.session(Samples.ZETA)!!
+        rule.setContent {
+            Harness(spy) {
+                CompositionLocalProvider(LocalToastNow provides ToastNow({ said.value }, { said.value = null })) {
+                    SessionSheet(hub, s, usage = null, onModel = {}, onSwitchAgent = {}, onRetried = {}, onDismiss = { dismissed++ })
+                }
+            }
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText(words).assertDoesNotExist()
+        said.value = words
+        rule.waitForIdle()
+        rule.onNodeWithText(words).assertExists()
+        rule.snap("sheet_app_message")
+        rule.onNodeWithText(words).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(words).assertDoesNotExist()
+        assertEquals("a tap on it isn't a tap outside the sheet", 0, dismissed)
     }
 
     @Test fun anAgentWaitingOnItsBackgroundCommandIsAtWorkAndSaysSo() {

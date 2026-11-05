@@ -4,6 +4,7 @@ import com.prudnikweb.hypernova.data.Str
 import com.prudnikweb.hypernova.ui.platform.stringResource
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +41,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,8 +55,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -94,7 +99,7 @@ fun GlassDialog(
     /** What the choice shows besides words, between [line] and More. */
     body: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
-    SharedUi.platform.overlays.Window(onDismiss, eyebrow ?: title, if (warm) tint else null) { shown ->
+    PopupWindow(onDismiss, eyebrow ?: title, if (warm) tint else null) { shown ->
         PopupEnter(shown) {
             Column(
                 modifier
@@ -168,7 +173,7 @@ fun GlassSheet(
     scroll: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    SharedUi.platform.overlays.Window(onDismiss, title, null) { shown ->
+    PopupWindow(onDismiss, title, null) { shown ->
         PopupEnter(shown) {
             Column(
                 Modifier
@@ -187,6 +192,55 @@ fun GlassSheet(
                 Spacer(Modifier.height(14.dp))
                 content()
             }
+        }
+    }
+}
+
+/**
+ * The app's message as it stands, for a pop-up's window: it's over where the app draws its message, so it draws it again on its card.
+ * Null where nothing provides it (a test's screen).
+ */
+class ToastNow(val text: () -> String?, val dismiss: () -> Unit)
+val LocalToastNow = staticCompositionLocalOf<ToastNow?> { null }
+
+/** Each system's window for a card, with the app's message on it: the window is over where the app draws one, which would go unseen (the owner, 2026-11-04). */
+@Composable
+private fun PopupWindow(onDismiss: () -> Unit, pane: String, tint: Color?, content: @Composable (shown: Boolean) -> Unit) {
+    SharedUi.platform.overlays.Window(onDismiss, pane, tint) { shown ->
+        Box(contentAlignment = Alignment.TopCenter) {
+            content(shown)
+            PopupToast()
+        }
+    }
+}
+
+/**
+ * The app's message, on the card's top edge: a line of it covers the handle and leaves the title, and it's clear of the buttons and a keyboard. Solid, as the card's words
+ * would read through the glass. The windows keep room above a card for its rise. A tap puts it away, as the app's own.
+ */
+@Composable
+private fun PopupToast() {
+    val now = LocalToastNow.current ?: return
+    val text = now.text()
+    val last = remember { arrayOf<String?>(null) }
+    if (text != null) last[0] = text
+    val reduced = LocalMotion.current.reduced
+    AnimatedVisibility(
+        text != null,
+        enter = if (reduced) EnterTransition.None else fadeIn(tween(Motion.DIALOG)),
+        exit = if (reduced) ExitTransition.None else fadeOut(tween(Motion.DIALOG)),
+    ) {
+        Box(
+            Modifier
+                .padding(horizontal = 20.dp)
+                .offset(y = (-24).dp)
+                .background(HN.bg900, RoundedCornerShape(18.dp))
+                .popupGlass(null, radius = 18.dp)
+                .clickable(remember { MutableInteractionSource() }, indication = null, onClick = now.dismiss)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+                .padding(horizontal = 18.dp, vertical = 14.dp),
+        ) {
+            HText(last[0].orEmpty(), style = Type.small, color = HN.ink)
         }
     }
 }

@@ -282,6 +282,7 @@ fun App(vm: HubViewModel, askNotifications: () -> Unit) {
         CompositionLocalProvider(
             androidx.compose.ui.platform.LocalUriHandler provides links,
             LocalHaze provides haze, LocalToast provides vm::showToast, LocalOpener provides opener,
+            com.prudnikweb.hypernova.ui.components.LocalToastNow provides remember(vm) { com.prudnikweb.hypernova.ui.components.ToastNow({ vm.toast?.text }, vm::dismissToast) },
             LocalConfirm provides { vm.confirm = it },
             LocalAppScope provides vm.appScope,
             LocalAskNotifications provides askNotifications,

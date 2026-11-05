@@ -44,7 +44,7 @@ fun App(shell: Shell, reduced: Boolean = false) {
     val opener = remember(shell) { deskOpener(shell) }
     var asking by remember { androidx.compose.runtime.mutableStateOf<com.prudnikweb.hypernova.data.Confirm?>(null) }
     AtlasTheme(reduced) {
-        CompositionLocalProvider(com.prudnikweb.hypernova.ui.LocalConfirm provides { asking = it }, LocalToast provides shell::say, LocalOpener provides opener, LocalAppScope provides Core.scope, LocalShell provides shell) {
+        CompositionLocalProvider(com.prudnikweb.hypernova.ui.LocalConfirm provides { asking = it }, LocalToast provides shell::say, com.prudnikweb.hypernova.ui.components.LocalToastNow provides remember(shell) { com.prudnikweb.hypernova.ui.components.ToastNow({ shell.toast }, shell::dismissToast) }, LocalOpener provides opener, LocalAppScope provides Core.scope, LocalShell provides shell) {
         asking?.let { c ->
             com.prudnikweb.hypernova.ui.components.ConfirmDialog(
                 visible = true, title = c.title, body = c.body, confirm = c.action, danger = c.danger,

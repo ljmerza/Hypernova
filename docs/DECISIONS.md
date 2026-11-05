@@ -4752,5 +4752,5 @@ The owner: tapping a permission mode on a phone "does nothing". The session shee
 1. **What a mode change has to say shows under the picker,** in the sheet, in the server's words, on both clients.
 2. **The server logs a refused change by code**, with the mode and no words of the session's.
 3. **Measured on real Claude Code 2.1.318:** every change on a shared terminal and on a job works in under a second. Right after it starts, the box isn't drawn yet and the change is refused as "showing something". `mode-switch-e2e` holds it. The owner's report was on another server, so what it refused there isn't known.
-4. **Other sheet actions still say things through the toast:** the model and effort changes among them. Not changed here: LATER L147.
+4. **Every other message reaches a card too.** A pop-up's window draws the app's message at the top of its card, on both clients (`PopupWindow`, `components/Popups.kt`), whichever screen said it and from where, for as long as the app shows it. A tap puts it away. The app's own timer and words stay the one source, and a message still up when the card closes carries on in the app. LATER L147.
 

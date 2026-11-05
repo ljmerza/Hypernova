@@ -1,8 +1,11 @@
 package com.prudnikweb.hypernova.desktop
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -96,6 +99,20 @@ class SessionSheetTest {
         onNodeWithText(word(Str.chat_close)).performClick()
         waitForIdle()
         onNodeWithText(word(Str.session_sheet_tab_overview)).assertDoesNotExist()
+    }
+
+    @Test fun theAppsMessageShowsOnACardOverTheWindowAndAClickPutsItAway() = runDesktopComposeUiTest(900, 800) {
+        val words = "The terminal didn’t answer. Try again in a moment."
+        val onTheCard = hasText(words) and SemanticsMatcher.expectValue(SemanticsProperties.LiveRegion, LiveRegionMode.Polite)
+        up()
+        openSheet()
+        shell.say(words)
+        until("it's on the card") { runCatching { onNode(onTheCard).assertIsDisplayed() }.isSuccess }
+        onNode(onTheCard).performClick()
+        waitForIdle()
+        onNode(onTheCard).assertDoesNotExist()
+        assertEquals(null, shell.toast)
+        onNodeWithText(word(Str.session_sheet_tab_overview)).assertIsDisplayed()
     }
 
     @Test fun closeAndEscapePutItAway() = runDesktopComposeUiTest(1700, 1100) {
