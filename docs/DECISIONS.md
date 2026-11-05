@@ -4745,3 +4745,12 @@ The owner: "I want to be able to fully edit the settings from the ui". Offered t
 4. **Kept as they are:** taking Claude Code's queue out and typing back what stays; notification buttons needing an unlocked phone; Continue and a blocked call's move still going to the bottom; 10 minutes of following `/clear`; "Being edited" with no timeout; `/clear [name]` from a client's box going as a message; the logo keeping Home's filter and sort; no logo on Settings' sub-pages.
 5. **For later:** LATER L140 to L143.
 
+## A mode change says what happened in the sheet (2026-11-04)
+
+The owner: tapping a permission mode on a phone "does nothing". The session sheet is its own window, over the toast's, so a refusal's words were drawn behind it.
+
+1. **What a mode change has to say shows under the picker,** in the sheet, in the server's words, on both clients.
+2. **The server logs a refused change by code**, with the mode and no words of the session's.
+3. **Measured on real Claude Code 2.1.318:** every change on a shared terminal and on a job works in under a second. Right after it starts, the box isn't drawn yet and the change is refused as "showing something". `mode-switch-e2e` holds it. The owner's report was on another server, so what it refused there isn't known.
+4. **Other sheet actions still say things through the toast:** the model and effort changes among them. Not changed here: LATER L147.
+

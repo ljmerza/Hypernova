@@ -1255,25 +1255,30 @@ async function api(c: Ctx): Promise<void> {
       const b = await readJsonBody(req)
       const mode = String(b.permissionMode ?? 'default')
       if (!['default', 'acceptEdits', 'plan', 'auto', 'bypassPermissions'].includes(mode)) throw new HttpError(400, 'bad_mode', 'That isn’t a permission mode.')
+      // Why, in the log: a client may not get to show it. Only the code and the modes, no words of the session's.
+      const refused = (code: string, words: string) => {
+        log('mode change refused', id!.slice(0, 8), mode, code)
+        return new HttpError(409, code, words)
+      }
       // A `claude agents` job whose `claude attach` didn't open, or a holder showing another job or
       // the agent list: Shift+Tab there would change another session's mode.
-      if (agentsJob && !tid) throw new HttpError(409, 'terminal_busy', 'The background session didn’t open. Try again in a moment.')
-      if (tid && attachDrifted(tid, id!)) throw new HttpError(409, 'terminal_busy', 'The terminal shows another session. Try again in a moment.')
+      if (agentsJob && !tid) throw refused('terminal_busy', 'The background session didn’t open. Try again in a moment.')
+      if (tid && attachDrifted(tid, id!)) throw refused('terminal_busy', 'The terminal shows another session. Try again in a moment.')
       if (tid) {
         // Bypass in a terminal that wasn't started with it allowed: Shift+Tab never gets there, so
         // don't press it (the phone knows beforehand from session.bypassAvailable).
-        if (mode === 'bypassPermissions' && getSession(id!)?.bypassAvailable === false) throw new HttpError(409, 'mode_unavailable', 'This session wasn’t started with “bypass permissions”, so it can’t switch to it.')
+        if (mode === 'bypassPermissions' && getSession(id!)?.bypassAvailable === false) throw refused('mode_unavailable', 'This session wasn’t started with “bypass permissions”, so it can’t switch to it.')
         // A shared terminal: the holder presses Shift+Tab until Claude Code shows the mode.
         const r = await switchTermMode(tid, mode)
         if (!r.ok) {
-          if (r.reason === 'no_input') throw new HttpError(409, 'waiting', 'Claude is showing something in the terminal. Answer it first, then change the mode.')
-          if (r.reason === 'unavailable') throw new HttpError(409, 'mode_unavailable', mode === 'bypassPermissions' ? 'This session wasn’t started with “bypass permissions”, so it can’t switch to it.' : 'This session can’t switch to that mode.')
-          throw new HttpError(409, 'terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
+          if (r.reason === 'no_input') throw refused('waiting', 'Claude is showing something in the terminal. Answer it first, then change the mode.')
+          if (r.reason === 'unavailable') throw refused('mode_unavailable', mode === 'bypassPermissions' ? 'This session wasn’t started with “bypass permissions”, so it can’t switch to it.' : 'This session can’t switch to that mode.')
+          throw refused('terminal_busy', 'The terminal didn’t answer. Try again in a moment.')
         }
         upsertSession(id!, { permissionMode: r.mode ?? mode })
         return json(res, 200, { session: listSessions().find((x) => x.id === id) })
       }
-      if (!isSdk(id!)) throw new HttpError(409, 'terminal_mode', 'Change the mode in the terminal: Shift+Tab cycles through them.')
+      if (!isSdk(id!)) throw refused('terminal_mode', 'Change the mode in the terminal: Shift+Tab cycles through them.')
       const applies = await setMode(id!, mode)
       // "next_turn": a turn is running and the mode starts with the next one.
       return json(res, 200, { session: listSessions().find((x) => x.id === id), applies })

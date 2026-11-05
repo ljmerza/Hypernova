@@ -387,27 +387,33 @@ private fun ModelPart(hub: Hub, s: Session, usage: SessionUsage?, change: Boolea
  */
 @Composable
 private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Boolean, onRetried: () -> Unit, onEmptied: () -> Unit, onBrought: () -> Unit) {
-    val toast = LocalToast.current
     val appScope = LocalAppScope.current
     val res = wordsNow()
     val codexNextTurn = stringResource(Str.cx_mode_next_turn)
     val bypassNextTurn = stringResource(Str.mode_bypass_next_turn)
+    // What a change said, here in the sheet: its window is over the toast's, so a toast would never be seen (the owner, 2026-11-04).
+    var modeSaid by remember(s.id) { mutableStateOf<String?>(null) }
+    var modeRefused by remember(s.id) { mutableStateOf(false) }
+    fun modeChange(m: String, later: String) {
+        modeSaid = null
+        appScope.launch {
+            hub.setMode(s.id, m)
+                .onSuccess { nextTurn -> modeRefused = false; modeSaid = later.takeIf { nextTurn } }
+                .onFailure { modeRefused = true; modeSaid = it.message.orEmpty() }
+        }
+    }
     when {
         change && s.codex -> com.prudnikweb.hypernova.ui.components.Segmented(
             AgentKind.CODEX_MODES.map { it to com.prudnikweb.hypernova.ui.home.modeTitle(it) },
             s.mode,
             { m ->
-                if (m != s.mode) appScope.launch {
-                    hub.setMode(s.id, m).onSuccess { nextTurn -> if (nextTurn) toast(codexNextTurn) }.onFailure { toast(it.message.orEmpty()) }
-                }
+                if (m != s.mode) modeChange(m, codexNextTurn)
             },
         )
         change -> com.prudnikweb.hypernova.ui.components.ModePicker(
             s.mode,
             { m ->
-                if (m != s.mode) appScope.launch {
-                    hub.setMode(s.id, m).onSuccess { nextTurn -> if (nextTurn) toast(bypassNextTurn) }.onFailure { toast(it.message.orEmpty()) }
-                }
+                if (m != s.mode) modeChange(m, bypassNextTurn)
             },
             bypassAvailable = s.bypassAvailable,
         )
@@ -421,6 +427,10 @@ private fun PermissionsPart(hub: Hub, s: Session, change: Boolean, atBlocked: Bo
                 style = Type.small, color = HN.inkDim, modifier = Modifier.padding(start = 4.dp),
             )
         }
+    }
+    modeSaid?.takeIf { it.isNotBlank() }?.let { said ->
+        Spacer(Modifier.height(8.dp))
+        HText(said, style = Type.small, color = if (modeRefused) HN.danger else HN.inkMuted, modifier = Modifier.padding(start = 4.dp))
     }
     var seen by remember(s.id) { mutableStateOf(s.blockedCalls > 0) }
     LaunchedEffect(s.blockedCalls) { if (s.blockedCalls > 0) seen = true }

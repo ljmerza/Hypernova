@@ -35,7 +35,7 @@ class SessionSheetTest {
 
     @Before fun setUp() = resetPrefs()
 
-    private fun sheet(hub: FakeHub, id: String) {
+    private fun sheet(hub: com.prudnikweb.hypernova.data.Hub, id: String) {
         val s = hub.session(id)!!
         rule.setContent {
             Harness(spy) {
@@ -185,6 +185,19 @@ class SessionSheetTest {
         // One ask: no "Allow these".
         rule.onNodeWithText(str(R.string.several_seam).uppercase()).assertDoesNotExist()
         rule.snap("sheet_why_asked")
+    }
+
+    @Test fun aRefusedModeChangeSaysWhyInTheSheet() {
+        val words = "Claude is showing something in the terminal. Answer it first, then change the mode."
+        val base = FakeHub()
+        val hub = object : com.prudnikweb.hypernova.data.Hub by base {
+            override suspend fun setMode(sessionId: String, mode: String): Result<Boolean> = Result.failure(IllegalStateException(words))
+        }
+        sheet(hub, Samples.ZETA)
+        tab(R.string.session_sheet_permissions)
+        rule.onNodeWithText(str(R.string.mode_plan), useUnmergedTree = true).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(words).assertExists()
     }
 
     @Test fun modePickerChangesTheMode() {

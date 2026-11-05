@@ -120,6 +120,16 @@ class SessionSheetTest {
         inSheet(word(Str.mode_bypass)).assertIsDisplayed()
     }
 
+    @Test fun aRefusedModeChangeSaysWhyInTheSheet() = runDesktopComposeUiTest(1700, 1100) {
+        val words = "The terminal didn’t answer. Try again in a moment."
+        d.on("POST", "/v1/sessions/s1/mode") { FakeDaemon.refusal(409, "terminal_busy", words) }
+        up()
+        openSheet()
+        tab(Str.session_sheet_permissions)
+        inSheet(word(Str.mode_plan)).performClick()
+        until("it says why") { runCatching { inSheet(words).assertIsDisplayed() }.isSuccess }
+    }
+
     @Test fun aModeChangeGoesToTheServer() = runDesktopComposeUiTest(1700, 1100) {
         d.ok("POST", "/v1/sessions/s1/mode", JSONObject())
         up()
