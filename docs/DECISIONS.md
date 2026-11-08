@@ -3309,7 +3309,7 @@ side."
 1. **The box is measured first, the bar last.** The bar takes what the box and the rest leave it, so
    nothing it lists can push the box off or clip it, at its 6 lines, with attachments, or with the
    keyboard up.
-2. **The opened bar gets half of the room between the header and the box,** with or without the
+2. **The opened bar gets 65 in a hundred of the room between the header and the box** (half until the owner's "a little bit higher", 2026-11-07), with or without the
    keyboard: a cap, worked out as it's measured, not a fold. It doesn't fold by itself when the
    keyboard opens: that would move the card under the finger, and a tap on it folds it anyway. Some
    of the chat stays in view.
@@ -4754,3 +4754,10 @@ The owner: tapping a permission mode on a phone "does nothing". The session shee
 3. **Measured on real Claude Code 2.1.318:** every change on a shared terminal and on a job works in under a second. Right after it starts, the box isn't drawn yet and the change is refused as "showing something". `mode-switch-e2e` holds it. The owner's report was on another server, so what it refused there isn't known.
 4. **Every other message reaches a card too.** A pop-up's window draws the app's message at the top of its card, on both clients (`PopupWindow`, `components/Popups.kt`), whichever screen said it and from where, for as long as the app shows it. A tap puts it away. The app's own timer and words stay the one source, and a message still up when the card closes carries on in the app. LATER L147.
 
+
+## The session sheet starts with the mode, and the working panel opens higher (2026-11-07)
+
+The owner, of the session sheet: "don't need session title, folder, date in the top here in this session menu. the mode, model, etc should be the first thing". Of the working panel over the chat: "make this menu that pops up a little bit higher so I can see more information in it when I expand it".
+
+1. **The session sheet opens on its summary line** (the mode, the model, the agents, what's blocked), then its tabs. The session's name, folder and short id are gone from its top: the chat's top bar has them, right behind the sheet. On both clients, as the sheet is shared.
+2. **The opened working panel may take 65 in a hundred of the room between the header and the box,** up from half. Its other rules stand: the box is measured first, a short screen still gets the folded bar and a row, and it never takes more than is left.

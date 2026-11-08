@@ -616,13 +616,13 @@ class SessionScreenTest {
         assertTrue("the list ends at $listBottom, with the line under it, above the box", listBottom + 31.dp <= box().getUnclippedBoundsInRoot().top)
     }
 
-    @Test fun anOpenPanelTakesAboutHalfOfTheRoomAndScrollsToItsLastRow() {
+    @Test fun anOpenPanelTakesItsShareOfTheRoomAndScrollsToItsLastRow() {
         openedPanel()
         assertBoxHasRoom()
         val headerBottom = rule.onNodeWithText("Long turn").getUnclippedBoundsInRoot().bottom
         val boxTop = box().getUnclippedBoundsInRoot().top
         val panelTop = panelToggle().getUnclippedBoundsInRoot().top
-        assertTrue("half of the room or less: the panel starts at $panelTop, between $headerBottom and $boxTop", panelTop - headerBottom >= (boxTop - headerBottom) * 0.4f)
+        assertTrue("its share of the room or less, with chat above it: the panel starts at $panelTop, between $headerBottom and $boxTop", panelTop - headerBottom >= (boxTop - headerBottom) * 0.4f)
         assertListClearsTheLine()
         snapPanel("chat_status_panel_open")
         // The last to-do is reachable, whole, and stops short of the line.
