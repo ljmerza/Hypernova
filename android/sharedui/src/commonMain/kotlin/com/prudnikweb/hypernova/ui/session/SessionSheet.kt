@@ -54,7 +54,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.prudnikweb.hypernova.data.AgentKind
 import com.prudnikweb.hypernova.data.ClaudeEffort
 import com.prudnikweb.hypernova.data.Hub
@@ -158,15 +157,7 @@ internal fun ColumnScope.SessionSheetBody(
     val agents = sheetAgents(hub.agents(session.id))
     val atWork = agentsAtWork(session, agents)
     run {
-        HText(session.name, style = Type.title, color = HN.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(2.dp))
-        // As the header has it: the project, and its short id as a quiet mark after it.
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            HText(session.project, style = Type.monoSmall, color = HN.inkDim, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
-            Spacer(Modifier.width(8.dp))
-            HText(session.hex, style = Type.monoSmall.copy(fontSize = 10.sp), color = HN.inkDim.copy(alpha = 0.75f), maxLines = 1)
-        }
-        Spacer(Modifier.height(10.dp))
+        // No name, folder or id first: the chat's top bar has them, right behind the sheet (the owner, 2026-11-07). The mode, model and agents come first.
         val unknown = stringResource(Str.model_default)
         SummaryLine(sheetSummary(session, atWork, if (usage == null) session.model else stripModel(usage, session.model, unknown)))
         Spacer(Modifier.height(14.dp))
