@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
@@ -73,6 +74,17 @@ class SessionSheetTest {
         rule.onNodeWithText(str(R.string.session_sheet_where).uppercase(), useUnmergedTree = true).assertExists()
         rule.onNodeWithText("j-zeta", useUnmergedTree = true).assertExists()
         // No picture of this tab: its "Started" is a wall-clock time.
+    }
+
+    @Test fun itKeepsOneHeightFromTabToTab() {
+        sheet(FakeHub(), Samples.ZETA)
+        // The sheet rises from the bottom, so its height shows at its top: the tab row's.
+        fun rowTop() = rule.onNodeWithText(str(R.string.session_sheet_agents)).getUnclippedBoundsInRoot().top
+        val first = rowTop()
+        for (t in listOf(R.string.session_sheet_agents, R.string.session_sheet_tab_mcp, R.string.session_sheet_permissions, R.string.session_sheet_title, R.string.session_sheet_tab_commands)) {
+            tab(t)
+            assertEquals("the sheet's top stays where it was on ${str(t)}", first, rowTop())
+        }
     }
 
     @Test fun theAppsMessageShowsOnTheSheetAndATapPutsItAway() {

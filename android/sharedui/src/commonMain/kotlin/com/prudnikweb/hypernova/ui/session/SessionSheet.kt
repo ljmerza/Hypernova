@@ -123,7 +123,7 @@ internal fun SessionSheet(
 ) {
     // Rename or Delete from the actions, over the sheet (ui/home/SessionMenu.kt).
     var menuPage by remember { mutableStateOf<MenuPage?>(null) }
-    ChatSheet(stringResource(Str.session_sheet_title), onDismiss, scroll = false) {
+    ChatSheet(stringResource(Str.session_sheet_title), onDismiss, height = SHEET_HEIGHT, scroll = false) {
         SessionSheetBody(hub, session, usage, onModel, onSwitchAgent, onRetried, onEmptied, onDismiss, { menuPage = it }, atBlocked, atAgents, onCompact)
     }
     menuPage?.let { SessionMenu(hub, session, { menuPage = null }, start = it) }
@@ -166,7 +166,7 @@ internal fun ColumnScope.SessionSheetBody(
         // The tab's parts, scrolling under the row, from the top for each tab; a floor under them
         // so the sheet doesn't jump much from one tab to the next.
         key(tab) {
-            Column(Modifier.weight(1f, fill = false).heightIn(min = TAB_MIN_HEIGHT).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            Column(Modifier.weight(1f).heightIn(min = TAB_MIN_HEIGHT).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 when (tab) {
                     SheetTab.Overview -> {
                         SheetSeam(stringResource(Str.model))
@@ -236,6 +236,12 @@ internal fun ColumnScope.SessionSheetBody(
 
 /** The least a tab's parts take, so a short tab (no agents) doesn't shrink the sheet to a strip. */
 private val TAB_MIN_HEIGHT = 320.dp
+
+/**
+ * The sheet's one height, whichever tab is open, so it doesn't jump from tab to tab and Close stays where it was (the owner, 2026-11-07): a
+ * sheet's most, shrunk to fit a short screen or the keyboard. The tabs' parts fill what the summary and the tab row leave, and scroll in it.
+ */
+private val SHEET_HEIGHT = 640.dp
 
 /** A part's seam, as the automation editor's blocks have them. */
 @Composable
